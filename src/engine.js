@@ -1275,7 +1275,9 @@ export function loanTargets(g, count = 2) {
   const age = ageOf(g);
   if (!p.club || p.loanFrom || age > 30) return [];              // 조건 ③
   const myAvg = teamAvgAt(p.club, g.world.year);
-  if (Math.abs(p.ovr - myAvg) < 10) return [];                   // 조건 ②
+  // 조건 ②: 소속팀 평균에 10 이상 "못 미칠" 때만. 절대값으로 두면 팀보다 잘하는
+  // 선수를 하위 리그로 임대 보내는 결과가 나온다 — 임대는 못 뛰는 선수를 보내는 제도다.
+  if (myAvg - p.ovr < 10) return [];                             // 조건 ②
   const near = NEIGHBOUR[p.club.nat] || [p.club.nat];
   const cand = CLUBS.filter((c) => {
     if (c.youth || c.id === p.club.id || !clubExists(c, g.world.year)) return false;
@@ -1345,7 +1347,7 @@ function offerChoices(g, offers, { loan = false } = {}) {
     const up = cur ? c.rep > cur.rep + 6 : true;
     const fit = fitLabel(g, c);
     return {
-      t: `${c.name} — ${c.league} (${DIV_LABEL[c.div]})${loan ? ' [임대]' : ''}`,
+      t: `"${c.name}로 가자." — ${/\d부/.test(c.league) ? c.league : `${c.league} (${DIV_LABEL[c.div]})`}${loan ? ' · 임대' : ''}`,
       meta: `팀 평균 ${fit.avg} · 내 능력 ${ability(g)} → ${fit.label} · 예상 주급 ${fmtWeekly(salaryFor(c, g.player.ovr, g.world.year, g.player.reputation))}`,
       fit,
       tags: up ? ['ambition', 'risk'] : ['safe'],
@@ -1387,7 +1389,7 @@ ev({
       `등록하려면 회비를 내야 하고, 누군가는 매주 아이를 데려다줘야 한다.`;
   },
   choices: () => [
-    { t: '동네 클럽에 등록한다.', meta: '정식 유소년 코스의 출발점', risk: 'SAFE', parent: 1, injury: 1, tags: ['ambition'],
+    { t: '"등록하자. 골목에서만 차면 아무도 안 봐."', meta: '정식 유소년 코스의 출발점', risk: 'SAFE', parent: 1, injury: 1, tags: ['ambition'],
       fx: (gg) => {
         const ok = gg.rng.chance(clamp(0.32 + gg.player.econ.household / 140 + gg.world.reaction * 0.13, 0.1, 0.95));
         if (ok) {
@@ -1401,7 +1403,7 @@ ev({
       out: (gg) => gg.flags.registered
         ? '유니폼을 받았다. 사이즈가 두 단계 커서 무릎까지 내려온다.'
         : '회비를 낼 수 없었다. 대신 광장에서 해가 질 때까지 찼다.' },
-    { t: '학교와 골목 축구로 충분하다.', meta: '비용 0 · 대신 아무도 지켜보지 않는다', risk: 'MID', parent: 0, injury: 0, tags: ['safe'],
+    { t: '"학교랑 골목이면 됐어. 돈 드는 건 못 해."', meta: '비용 0 · 노출 없음', risk: 'MID', parent: 0, injury: 0, tags: ['safe'],
       fx: (gg) => { gg.player.willToPlay += 6; gg.player.academic += 6; },
       out: () => '등록비도, 데려다줄 사람도 필요 없다. 대신 아무도 지켜보지 않는다.' },
   ],
@@ -1414,10 +1416,10 @@ ev({
     `부모 성향: ${PARENT_PERSONALITIES[g.player.personality].label}\n` +
     `현재 반응: ${REACTIONS[g.world.reaction].label} — ${REACTIONS[g.world.reaction].blurb}`,
   choices: () => [
-    { t: '성적을 유지하겠다고 약속하고 축구를 늘린다.', meta: '학업 +  스트레스 +', risk: 'SAFE', parent: 1, injury: 0, tags: ['discipline'],
+    { t: '"성적은 지키겠다고 약속하자. 그거면 훈련을 늘릴 수 있어."', meta: '학업 +  스트레스 +', risk: 'SAFE', parent: 1, injury: 0, tags: ['discipline'],
       fx: (gg) => { shiftReaction(gg, 1, '학업 유지 약속'); gg.player.stress += 8; gg.player.academic += 6; },
       out: (gg) => { remember(gg, 'promise_school', `${gg.world.year}년, 성적 유지를 조건으로 축구를 허락받았다.`, 0.7); return '거래가 성립했다. 이 약속은 20년 뒤에 다시 소환된다.'; } },
-    { t: '"축구밖에 없어요." 정면으로 부딪친다.', meta: '성공 시 반응 급상승 / 실패 시 급하락', risk: 'HIGH', parent: 2, injury: 0, tags: ['pride', 'risk'],
+    { t: '"그냥 말해버리자. 나 축구밖에 없어."', meta: '성공 시 반응 급상승 / 실패 시 급하락', risk: 'HIGH', parent: 2, injury: 0, tags: ['pride', 'risk'],
       fx: (gg) => {
         const ok = gg.rng.chance(0.38 + gg.world.reaction * 0.12);
         shiftReaction(gg, ok ? 2 : -1, ok ? '아이의 각오를 인정' : '충돌');
@@ -1426,7 +1428,7 @@ ev({
       out: (gg) => gg.world.reaction >= 2
         ? '한참 말이 없다가 고개를 끄덕였다. "그럼 진짜로 해라."'
         : '방문이 닫혔다. 그 뒤로 식탁에서 축구 얘기가 사라졌다.' },
-    { t: '아무 말 하지 않고 혼자 계속한다.', meta: '독기 + · 부모 반응 변화 없음', risk: 'MID', parent: 0, injury: 0, tags: [],
+    { t: '"말해서 뭐 해. 그냥 계속 나가면 되지."', meta: '독기 + · 부모 반응 변화 없음', risk: 'MID', parent: 0, injury: 0, tags: [],
       fx: (gg) => { gg.player.hidden.grit += 8; gg.player.willToPlay += 4; },
       out: () => '허락도 반대도 받지 않았다. 그냥 매일 나갔다.' },
   ],
@@ -1438,9 +1440,9 @@ ev({
     `3일간의 테스트. 같은 나이 아이가 400명 넘게 왔다.` +
     (ENV(g).immigrant ? `\n\n접수처에서 서류를 두 번 확인받았다. 앞의 아이들은 한 번이었다.` : ''),
   choices: () => [
-    { t: '내 플레이를 한다. 하던 대로.', meta: '변동성 낮음', risk: 'MID', parent: 0, injury: 0, tags: ['pride'], fx: (gg) => { gg.flags.trialStyle = 'self'; }, out: () => '3일이 지나갔다.' },
-    { t: '평가 기준에 맞춘다. 안전하게.', meta: '기본 점수 + / 잠재력 높으면 손해', risk: 'SAFE', parent: 0, injury: 0, tags: ['safe'], fx: (gg) => { gg.flags.trialStyle = 'safe'; }, out: () => '3일이 지나갔다.' },
-    { t: '무리해서라도 눈에 띄는 장면을 만든다.', meta: '±9점 도박', risk: 'HIGH', parent: 0, injury: 1, tags: ['risk'], fx: (gg) => { gg.flags.trialStyle = 'flash'; }, out: () => '3일이 지나갔다.' },
+    { t: '"하던 대로 하자. 여기서 나를 바꾸면 남는 게 없어."', meta: '변동성 낮음', risk: 'MID', parent: 0, injury: 0, tags: ['pride'], fx: (gg) => { gg.flags.trialStyle = 'self'; }, out: () => '3일이 지나갔다.' },
+    { t: '"평가지에 맞춰주자. 튀어서 떨어지는 애를 너무 많이 봤어."', meta: '기본 점수 + / 잠재력 높으면 손해', risk: 'SAFE', parent: 0, injury: 0, tags: ['safe'], fx: (gg) => { gg.flags.trialStyle = 'safe'; }, out: () => '3일이 지나갔다.' },
+    { t: '"한 장면이라도 만들어야지. 안 보이면 어차피 끝이잖아."', meta: '±9점 도박', risk: 'HIGH', parent: 0, injury: 1, tags: ['risk'], fx: (gg) => { gg.flags.trialStyle = 'flash'; }, out: () => '3일이 지나갔다.' },
   ],
   after: (g) => { g.flags.pendingTrial = true; },
 });
@@ -1464,7 +1466,7 @@ ev({
   choices: (g) => {
     g.flags.pendingTrial = false;
     if (g.flags.trialPass) {
-      return [{ t: '라 마시아에 들어간다.', meta: '최고의 훈련 환경 · 최악의 경쟁', risk: 'MID', parent: 2, injury: 1, tags: [],
+      return [{ t: '"들어가자. 여기서 안 되면 어디서도 안 돼."', meta: '최고의 훈련 환경 · 최악의 경쟁', risk: 'MID', parent: 2, injury: 1, tags: [],
         fx: (gg) => {
           gg.world.academyAccess = 2;
           joinClub(gg, clubById('esp1:FC Barcelona'), { wanted: true, years: 6 });
@@ -1476,13 +1478,13 @@ ev({
         out: () => '숙소에 짐을 풀었다. 같은 방 아이 셋 다 자기 지역에서 제일 잘하는 애였다.' }];
     }
     return [
-      { t: '증명해 보이겠다고 마음을 굳힌다.', meta: '독기 + · 스트레스 +', risk: 'MID', parent: 0, injury: 0, tags: ['ambition', 'pride'],
+      { t: '"저 문장은 외워두자. 언젠가 갚아줄 거니까."', meta: '독기 + · 스트레스 +', risk: 'MID', parent: 0, injury: 0, tags: ['ambition', 'pride'],
         fx: (gg) => { gg.player.hidden.grit += 6; gg.player.stress += 8; gg.player.trait.pride += 8; },
         out: (gg) => { remember(gg, 'rejection', `${gg.world.year}년 바르셀로나 유소년 탈락. 리포트 문장을 외웠다.`, 0.95); return '"필연성이 낮다"는 문장을 종이에 적어 서랍에 넣었다.'; } },
-      { t: '한동안 공을 보지 않았다.', meta: '자신감 − · 축구 의지 −', risk: 'HIGH', parent: -1, injury: 0, tags: [],
+      { t: '"당분간 공은 보지 말자. 지금은 못 하겠어."', meta: '자신감 − · 축구 의지 −', risk: 'HIGH', parent: -1, injury: 0, tags: [],
         fx: (gg) => { gg.player.confidence -= 16; gg.player.willToPlay -= 10; shiftReaction(gg, -1, '탈락 후 방황'); },
         out: (gg) => { remember(gg, 'rejection', `${gg.world.year}년 탈락. 그 여름을 통째로 잃었다.`, 0.85); return '두 달 동안 아무것도 하지 않았다.'; } },
-      { t: '바로 다른 팀을 알아본다.', meta: '적응력 +', risk: 'SAFE', parent: 0, injury: 0, tags: ['safe'],
+      { t: '"울 시간에 전화나 돌리자. 받아줄 데는 있어."', meta: '적응력 +', risk: 'SAFE', parent: 0, injury: 0, tags: ['safe'],
         fx: (gg) => { gg.player.hidden.adaptability += 6; gg.player.stress -= 4; },
         out: (gg) => { remember(gg, 'rejection', `${gg.world.year}년 탈락. 바로 다음 팀을 알아봤다.`, 0.7); return '울 시간에 전화를 돌렸다.'; } },
     ];
@@ -1497,13 +1499,13 @@ ev({
     g.flags.pendingYouth = false;
     const a = clubById('esp1:Real Betis'), b = clubById('esp3:CE Sabadell'), c = clubById('esp2:CD Tenerife');
     return [
-      { t: `${a.name} 유소년 — 최고의 환경. 집을 떠나야 한다.`, meta: '훈련 ★★★★☆ / 생활 ★★☆☆☆', risk: 'HIGH', parent: 1, injury: 1, tags: ['ambition', 'risk'],
+      { t: `"${a.name}로 가자. 집은 못 보겠지만 여기 있으면 안 늘어."`, meta: '훈련 ★★★★☆ / 생활 ★★☆☆☆', risk: 'HIGH', parent: 1, injury: 1, tags: ['ambition', 'risk'],
         fx: (gg) => { joinClub(gg, a, { years: 6 }); gg.player.stress += 16; gg.flags.leftHome = true; gg.player.trait.ambition += 8; },
         out: () => '열두 살에 기차를 혼자 탔다. 어머니는 플랫폼에서 끝까지 손을 흔들었다.' },
-      { t: `${b.name} 유소년 — 집에서 30분. 현실적인 선택.`, meta: '훈련 ★★☆☆☆ / 생활 ★★★★★', risk: 'SAFE', parent: 1, injury: 0, tags: ['safe'],
+      { t: `"${b.name}로 가자. 매일 집에서 저녁 먹는 것도 무시할 게 아니야."`, meta: '훈련 ★★☆☆☆ / 생활 ★★★★★', risk: 'SAFE', parent: 1, injury: 0, tags: ['safe'],
         fx: (gg) => { joinClub(gg, b, { years: 6 }); gg.player.stress -= 6; shiftReaction(gg, 1, '집 근처 클럽 선택'); },
         out: () => '매일 집에서 저녁을 먹는다. 부모님이 가장 안심한 선택이었다.' },
-      { t: `${c.name} 유소년 — 아무도 모르는 곳에서 다시 시작한다.`, meta: '적응력 + / 스트레스 ++', risk: 'HIGH', parent: -1, injury: 1, tags: ['risk'],
+      { t: `"${c.name}로 가자. 아무도 날 모르는 데서 다시 시작하고 싶어."`, meta: '적응력 + / 스트레스 ++', risk: 'HIGH', parent: -1, injury: 1, tags: ['risk'],
         fx: (gg) => { joinClub(gg, c, { years: 6 }); gg.player.hidden.adaptability += 8; gg.player.stress += 20; gg.flags.leftHome = true; },
         out: () => '섬으로 갔다. 여기서는 아무도 내가 탈락한 애라는 걸 모른다.' },
     ];
@@ -1521,7 +1523,7 @@ ev({
   choices: (g) => {
     const low = CLUBS.filter((c) => c.nat === 'ESP' && c.div === 3 && !c.youth);
     return [
-      { t: '하부리그 트라이아웃을 돌아본다.', meta: `성공 확률 능력 의존 (현재 ${ability(g)})`, risk: 'HIGH', parent: 0, injury: 1, tags: ['ambition', 'risk'],
+      { t: '"트라이아웃이라도 돌자. 아직 안 끝났어."', meta: `성공 확률 능력 의존 (현재 ${ability(g)})`, risk: 'HIGH', parent: 0, injury: 1, tags: ['ambition', 'risk'],
         fx: (gg) => {
           if (gg.rng.chance(clamp((gg.player.ovr - 40) / 26, 0.03, 0.7))) {
             joinClub(gg, gg.rng.pick(low), { years: 2 });
@@ -1535,7 +1537,7 @@ ev({
         out: (gg) => gg.player.active
           ? '3부 계약서에 서명했다. 주급은 아르바이트 수준이지만, 프로 선수다.'
           : '여섯 팀을 돌았다. 여섯 번 다 "연락드리겠습니다"였고, 아무도 연락하지 않았다.' },
-      { t: '축구를 접고 다른 길을 찾는다.', meta: '커리어 종료 · 학업/직업 트랙', risk: 'SAFE', parent: 1, injury: 0, tags: ['safe'],
+      { t: '"접자. 여기서 더 붙잡으면 시간만 버려."', meta: '커리어 종료 · 학업/직업 트랙', risk: 'SAFE', parent: 1, injury: 0, tags: ['safe'],
         fx: (gg) => {
           gg.player.active = false; gg.player.academic += 10;
           gg.player.path.push(`${gg.world.year} 축구 중단`);
@@ -1595,13 +1597,13 @@ ev({
         remember(gg, 'took_mortgage', `${gg.world.year}년, 아버지의 집 대출을 내 이름으로 넘겼다.`, 0.9);
       },
       out: () => '서류에 서명하는 데 20분이 걸렸다. 아버지는 그 자리에 오지 않았다.\n집을 지켰다. 대신 앞으로 몇 년간 내 통장은 내 것이 아니다.' });
-    list.push({ t: '돈이 되는 이적을 우선한다.',
+    list.push({ t: '"돈 되는 데로 가자. 지금은 집이 먼저야."',
       meta: '다음 이적시장에서 연봉 높은 오퍼를 우선 수락 · 축구적 성장 리스크',
       tags: ['ambition'],
       fx: (gg) => { gg.npcs.father.status = '실직'; gg.npcs.father.statusYear = gg.world.year; gg.flags.chaseMoney = true; gg.player.stress += 6; remember(gg, 'chase_money', `${gg.world.year}년, 가계 때문에 돈을 따라가기로 했다.`, 0.75); },
       out: () => '에이전트에게 전화했다. "주급 제일 높은 데로 보내주세요."\n그 통화 이후, 내 커리어의 기준이 하나 바뀌었다.' });
-    list.push({ t: '매달 생활비를 보내되 커리어는 그대로 간다.',
-      meta: `자산 축적 −30% · 스트레스 + · 부채는 생기지 않는다`,
+    list.push({ t: '"생활비는 매달 보내자. 대신 커리어는 안 건드려."',
+      meta: `자산 축적 −30% · 스트레스 + · 부채 없음`,
       tags: ['safe'],
       fx: (gg) => { gg.npcs.father.status = '실직'; gg.npcs.father.statusYear = gg.world.year; gg.flags.sendsMoney = true; gg.player.stress += 8; gg.player.econ.household = clamp(gg.player.econ.household + 8, 0, 100); },
       out: () => '매달 정해진 날에 송금한다. 아버지는 한 번도 고맙다고 하지 않았고, 나는 그걸 이해했다.' });
@@ -1629,7 +1631,7 @@ ev({
       `전화를 끊고 훈련장에 나갔다. 그날 슈팅이 하나도 안 들어갔다.`;
   },
   choices: (g) => (g.player.econ.assets >= g.flags._bail * 1.2 ? [
-    { t: '통장에서 바로 전액 낸다.',
+    { t: '"그냥 내 돈으로 내자. 이제 그럴 수 있잖아."',
       meta: `자산 ${fmtMoney(g.flags._bail)} 지출 · 부채 없음 · 형 관계 회복`,
       tags: ['family'],
       fx: (gg) => {
@@ -1639,7 +1641,7 @@ ev({
       },
       out: () => '계좌 이체 한 번으로 끝났다. 스무 살의 나에게는 불가능했던 일이다.\n형은 사흘 뒤에 나왔고, 아무 말도 하지 않고 내 어깨를 한 번 쳤다.' },
   ] : [
-    { t: '사채를 써서 보석금을 전액 낸다.',
+    { t: '"사채라도 쓰자. 형을 저기 두고 잠이 오겠어?"',
       meta: `부채 ${fmtMoney(g.flags._bail)} (연이자 34%) · 스트레스 ++ · 형 관계 회복`,
       tags: ['family', 'risk'],
       fx: (gg) => {
@@ -1648,8 +1650,8 @@ ev({
         remember(gg, 'bail_paid', `${gg.world.year}년, 형의 보석금을 사채로 냈다.`, 0.9);
       },
       out: () => '형은 사흘 뒤에 나왔다. 아무 말도 하지 않고 내 어깨를 한 번 쳤다.\n이자 34%. 이 숫자가 앞으로 몇 년간 내 이적 협상을 지배한다.' },
-    { t: '통장을 비우고 나머지는 구단에 가불을 요청한다.',
-      meta: '자산 소진 · 구단 신뢰 −8 · 감독이 사정을 알게 된다',
+    { t: '"통장 털고 나머지는 구단에 부탁하자. 창피한 건 나중 문제야."',
+      meta: '자산 소진 · 구단 신뢰 −8 · 감독이 사정을 알게 됨',
       tags: ['safe'],
       fx: (gg) => {
         const short = Math.max(0, gg.flags._bail - gg.player.econ.assets);
@@ -1659,7 +1661,7 @@ ev({
         remember(gg, 'bail_club', `${gg.world.year}년, 구단 가불로 형의 보석금을 냈다.`, 0.85);
       },
       out: () => '단장실에서 30분을 설명했다. 이자는 없다고 했다.\n다음 주부터 감독이 나를 다르게 봤다. 좋은 쪽인지 나쁜 쪽인지는 아직 모른다.' },
-    { t: '내지 않는다.',
+    { t: '"이번엔 안 내자. 계속 이러면 나도 같이 가라앉아."',
       meta: '부채 0 · 형 관계 파탄 · 스트레스 +++ · 30대 이벤트 분기 결정',
       tags: [],
       fx: (gg) => {
@@ -1683,13 +1685,13 @@ ev({
     `구단에 알리면 계약에 도덕 조항이 걸린다. 언론이 알면 이적 시장에서 값이 떨어진다.\n` +
     `혼자 해결해야 한다는 것만 확실하다.`,
   choices: () => [
-    { t: '구단에 알리고 저리 대출로 전환한다.', meta: '이자 34% → 9% · 평판 −5 · 감독 신뢰 −6', tags: ['safe'],
+    { t: '"구단에 털어놓자. 이자 34%는 혼자 감당이 안 돼."', meta: '이자 34% → 9% · 평판 −5 · 감독 신뢰 −6', tags: ['safe'],
       fx: (gg) => { gg.player.econ.debtRate = 0.09; gg.player.reputation -= 5; gg.npcs.coach.trust -= 6; gg.player.stress -= 10; },
       out: () => '단장이 은행을 연결해줬다. 대신 그 얘기가 라커룸에 돌았다.' },
-    { t: '이적으로 계약금을 만들어 한 번에 정리한다.', meta: '다음 이적에서 연봉보다 계약금 우선 · 축구적 후퇴 가능', tags: ['risk'],
+    { t: '"이적해서 계약금으로 한 번에 털자."', meta: '다음 이적에서 연봉보다 계약금 우선 · 축구적 후퇴 가능', tags: ['risk'],
       fx: (gg) => { gg.flags.chaseMoney = true; gg.player.stress += 8; },
       out: () => '에이전트에게 상황을 전부 말했다. "그럼 조건은 제가 정합니다."' },
-    { t: '버틴다. 시즌만 끝나면 갚을 수 있다.', meta: '이자 계속 · 스트레스 +++ · 성장률 패널티', tags: ['pride'],
+    { t: '"버티자. 시즌만 끝나면 갚을 수 있어."', meta: '이자 계속 · 스트레스 +++ · 성장률 패널티', tags: ['pride'],
       fx: (gg) => { gg.player.stress += 22; },
       out: () => '버텼다. 그 시즌 내내 밤에 잠들기까지 두 시간이 걸렸다.' },
   ],
@@ -1711,13 +1713,13 @@ ev({
     const offers = (g.flags._offers || []).map(clubById).filter(Boolean);
     const list = offerChoices(g, offers);
     if (g.player.club) {
-      list.push({ t: '남는다. 이 팀에서 증명한다.', meta: '감독 신뢰 + · 스트레스 −', risk: 'SAFE', parent: 0, injury: 0, tags: ['loyalty'],
+      list.push({ t: '"남자. 여기서 증명하면 되지."', meta: '감독 신뢰 + · 스트레스 −', risk: 'SAFE', parent: 0, injury: 0, tags: ['loyalty'],
         fx: (gg) => { gg.npcs.coach.trust += 6; gg.player.stress -= 4; gg.player.trait.loyalty += 5; },
         out: () => '떠나는 게 쉬웠을 것이다. 남는 쪽을 골랐다.' });
       const lt = loanTargets(g, 2);
       if (lt.length) list.push(...offerChoices(g, lt, { loan: true }));
     } else if (!offers.length) {
-      list.push({ t: '무적 상태로 훈련하며 기다린다.', meta: '축구 의지 − · 스트레스 +', risk: 'HIGH', parent: -1, injury: 0, tags: [],
+      list.push({ t: '"일단 몸이나 만들면서 기다리자. 전화는 오겠지."', meta: '축구 의지 − · 스트레스 +', risk: 'HIGH', parent: -1, injury: 0, tags: [],
         fx: (gg) => { gg.player.willToPlay -= 10; gg.player.stress += 10; shiftReaction(gg, -1, '소속팀 없음'); },
         out: () => '전화는 오지 않았다. 그래도 다음 주에도 나갔다.' });
     }
@@ -1739,7 +1741,7 @@ ev({
       `창밖으로 훈련장이 보인다. 아직 아무도 나오지 않았다.`;
   },
   choices: (g) => [
-    { t: '태업한다. 구단이 나를 팔게 만든다.',
+    { t: '"훈련을 놓자. 데리고 있는 게 손해라고 느껴야 풀어줄 거야."',
       meta: '결과 3분기: 징계(출전 급감) / 이적 허가 / 상승 조건 재계약',
       tags: ['risk', 'pride'],
       fx: (gg) => {
@@ -1773,7 +1775,7 @@ ev({
         RELEASED: '한 달 만에 구단이 손을 들었다. "팀 분위기를 해치는 선수는 데리고 있지 않는다."\n원하는 곳으로 갔다. 대신 이 도시에서의 평판은 남았다.',
         RENEW: '구단이 다른 카드를 냈다. 주급을 두 배 가까이 올린 재계약서였다.\n서명했다. 이적은 못 했지만, 이겼다고 볼 수도 있다.',
       }[gg.flags.holdoutResult] || '') },
-    { t: '받아들이고 이 시즌을 정면으로 뛴다.',
+    { t: '"받아들이자. 프로답게 뛰면 다음 여름엔 안 막겠지."',
       meta: '감독 신뢰 + · 스트레스 − · 다음 여름 이적 거부율 하락',
       tags: ['loyalty', 'discipline'],
       fx: (gg) => {
@@ -1802,10 +1804,10 @@ ev({
     const offers = (g.flags._offers || []).map(clubById).filter(Boolean);
     const loans = (g.flags._loans || []).map(clubById).filter(Boolean);
     const list = [...offerChoices(g, offers), ...offerChoices(g, loans, { loan: true })];
-    list.push({ t: '남아서 후반기 경쟁을 정면으로 한다.', meta: '스트레스 + · 감독 신뢰 +', risk: 'MID', parent: 0, injury: 1, tags: ['pride'],
+    list.push({ t: '"남아서 붙어보자. 밀려서 나가는 건 더 싫어."', meta: '스트레스 + · 감독 신뢰 +', risk: 'MID', parent: 0, injury: 1, tags: ['pride'],
       fx: (gg) => { gg.player.stress += 10; gg.npcs.coach.trust += 4; },
       out: () => '훈련장에서 가장 먼저 나오고 가장 늦게 들어갔다.' });
-    list.push({ t: '몸 상태 관리에 집중하며 후반기를 준비한다.', meta: '건강 ++ · 부상 위험 −', risk: 'SAFE', parent: 0, injury: 0, tags: ['discipline'],
+    list.push({ t: '"몸부터 만들자. 3월에 결과가 나오면 돼."', meta: '건강 ++ · 부상 위험 −', risk: 'SAFE', parent: 0, injury: 0, tags: ['discipline'],
       fx: (gg) => { gg.player.fitness = clamp(gg.player.fitness + 12, 0, 100); gg.player.hidden.injuryProne -= 5; gg.player.form -= 4; },
       out: () => '2월에 몸이 가벼웠다. 3월에 그게 결과로 나왔다.' });
     return list;
@@ -1841,13 +1843,13 @@ ev({
     const up = !!g.flags.justPromoted;
     g.flags.justPromoted = null; g.flags.justRelegated = null;
     const out = [
-      { t: up ? '남는다. 이 팀으로 1부를 밟는다.' : '남는다. 이 팀에서 다시 올라간다.',
+      { t: up ? '"남자. 이 팀으로 1부를 밟아보자."' : '"남자. 여기서 다시 올려놓으면 되지."',
         meta: up ? '주전 경쟁 · 감독 신뢰 +' : '확실한 주전 · 노출 하락',
         tags: ['loyalty'],
         fx: (gg) => { gg.npcs.coach.trust += 10; gg.player.stress += up ? 8 : -6; gg.player.trait.loyalty += 6; },
         out: () => up ? '유니폼을 그대로 입었다. 프리시즌에 영입된 선수가 내 포지션이었다.'
                       : '남았다. 이 리그에서 나는 가장 좋은 선수다. 그게 위로가 되지는 않는다.' },
-      { t: '이적을 요청한다.', meta: '여름 시장의 오퍼로 이동', tags: ['ambition'],
+      { t: '"이적 요청하자. 여기 더 있으면 썩어."', meta: '여름 시장의 오퍼로 이동', tags: ['ambition'],
         fx: (gg) => { gg.npcs.coach.trust -= 12; gg.flags.wantsOut = true; },
         out: () => '구단은 화를 냈지만 막지는 않았다.' },
     ];
@@ -1859,7 +1861,7 @@ ev({
   id: 'contract_renewal', when: (g) => A(g) >= 19 && g.player.active && g.player.club && g.world.year >= g.player.contractUntil - 1 && g.world.phase === 'SUMMER', w: () => 190,
   body: (g) => `${g.player.club.name}과의 계약이 ${g.player.contractUntil}년에 끝난다.\n현재 연봉 ${fmtMoney(g.player.econ.wageYear)} · 감독 신뢰 ${round(g.npcs.coach.trust)}/100`,
   choices: () => [
-    { t: '재계약한다. 안정을 택한다.', meta: '연봉 ×1.45 · 4년 연장', risk: 'SAFE', parent: 1, injury: 0, tags: ['safe', 'loyalty'],
+    { t: '"재계약하자. 지금은 안정이 필요해."', meta: '연봉 ×1.45 · 4년 연장', risk: 'SAFE', parent: 1, injury: 0, tags: ['safe', 'loyalty'],
       fx: (gg) => {
         gg.player.contractUntil = gg.world.year + 4; gg.player.stress -= 8; gg.npcs.coach.trust += 6;
         const frozen = marketClimate(gg).global && !isBigClub(gg, gg.player.club);
@@ -1869,13 +1871,13 @@ ev({
       out: (gg) => gg.flags.wageFrozen
         ? '4년 연장. 다만 주급은 동결이다. 구단은 "지금 시장에서는 이게 최선"이라고 했고, 그건 사실이었다.'
         : '4년 연장. 주급이 올랐다.' },
-    { t: '주급 인상을 강하게 요구한다.', meta: '성공 시 연봉 ×2.0 / 실패 시 신뢰 −16', risk: 'HIGH', parent: 0, injury: 0, tags: ['pride', 'risk'],
+    { t: '"세게 요구하자. 이 정도 받을 자격은 있잖아."', meta: '성공 시 연봉 ×2.0 / 실패 시 신뢰 −16', risk: 'HIGH', parent: 0, injury: 0, tags: ['pride', 'risk'],
       fx: (gg) => {
         if (gg.player.reputation + gg.npcs.coach.trust / 2 > 92) { gg.player.contractUntil = gg.world.year + 4; gg.flags.wageBump = 2.0; }
         else { gg.npcs.coach.trust -= 16; gg.player.stress += 12; gg.flags.standoff = true; }
       },
       out: (gg) => gg.flags.standoff ? '구단이 제안을 철회했다. 팬들은 "돈만 아는 선수"라고 쓴다.' : '요구가 통했다.' },
-    { t: '계약을 흘려서 자유계약(FA)으로 나간다.', meta: '이적료 0 · 야유 · 신뢰 −20', risk: 'HIGH', parent: -1, injury: 0, tags: ['risk', 'ambition'],
+    { t: '"계약을 흘리자. FA로 나가면 조건은 내가 골라."', meta: '이적료 0 · 야유 · 신뢰 −20', risk: 'HIGH', parent: -1, injury: 0, tags: ['risk', 'ambition'],
       fx: (gg) => { gg.npcs.coach.trust -= 20; gg.player.stress += 14; gg.flags.goingFA = true; },
       out: () => '이적료 없이 나갈 수 있다. 대신 이번 시즌 내내 야유를 듣는다.' },
   ],
@@ -1885,10 +1887,10 @@ ev({
   id: 'manager_change', when: (g) => A(g) >= 17 && g.player.active && g.player.club, w: () => 45,
   body: (g) => `${g.player.club.name} 감독이 경질됐다. 쌓아온 신뢰 ${round(g.npcs.coach.trust)}는 리셋이다.`,
   choices: () => [
-    { t: '새 감독의 전술에 맞춘다.', meta: '적응력에 따라 신뢰 결정', risk: 'MID', parent: 0, injury: 0, tags: ['adaptability'],
+    { t: '"맞춰주자. 살아남는 게 먼저야."', meta: '적응력에 따라 신뢰 결정', risk: 'MID', parent: 0, injury: 0, tags: ['adaptability'],
       fx: (gg) => { gg.npcs.coach.trust = clamp(50 + (gg.player.hidden.adaptability - 50) / 2 + gg.rng.norm(0, 8), 10, 95); gg.player.trait.adaptability += 8; },
       out: (gg) => gg.npcs.coach.trust > 60 ? '새 감독의 첫 명단에 이름이 있었다.' : '맞추려 했지만, 그가 원하는 선수는 내가 아니었다.' },
-    { t: '내 강점을 그대로 밀고 간다.', meta: '성공 시 신뢰 +16 / 실패 시 −22', risk: 'HIGH', parent: 0, injury: 0, tags: ['pride', 'risk'],
+    { t: '"내 걸로 밀고 가자. 바꿔서 애매해지면 그게 끝이야."', meta: '성공 시 신뢰 +16 / 실패 시 −22', risk: 'HIGH', parent: 0, injury: 0, tags: ['pride', 'risk'],
       fx: (gg) => { const ok = gg.rng.chance(0.42 + (gg.player.ovr - 68) / 60); gg.npcs.coach.trust = ok ? clamp(gg.npcs.coach.trust + 16, 10, 95) : clamp(gg.npcs.coach.trust - 22, 5, 95); },
       out: (gg) => gg.npcs.coach.trust > 55 ? '감독이 결국 나에게 맞춰 팀을 짰다.' : '벤치에서 후반기를 보냈다.' },
   ],
@@ -1905,7 +1907,7 @@ ev({
       `아이러니한 상황이 됐다. 그동안 "안정적인 길"을 말하던 부모가, 지금 당장 현금이 들어오는 쪽을 보고 있다.`;
   },
   choices: () => [
-    { t: '지금 프로 계약에 서명해서 가계를 구한다.', meta: '즉시 수입 · 학업 포기', risk: 'MID', parent: 2, injury: 1, tags: ['ambition'],
+    { t: '"지금 서명하자. 집이 먼저 무너지면 축구도 없어."', meta: '즉시 수입 · 학업 포기', risk: 'MID', parent: 2, injury: 1, tags: ['ambition'],
       fx: (gg) => {
         gg.player.econ.household = clamp(gg.player.econ.household - gg.flags._hit * 0.4, 0, 100);
         const dom = CLUBS.filter((c) => c.nat === 'ESP' && c.div >= 2 && scoutedValue(gg, c) >= c.req - 8);
@@ -1914,7 +1916,7 @@ ev({
         remember(gg, 'breadwinner', '2008년 금융위기. 18세에 내 연봉이 집안의 주 수입이 됐다.', 0.95);
       },
       out: () => '열여덟에 가장이 됐다. 그 순간 아버지의 눈을 봤다. 고마움과 미안함이 같이 있었다.' },
-    { t: '학업을 병행하며 안전하게 간다.', meta: '안전망 확보 · 성장 −', risk: 'SAFE', parent: -1, injury: 0, tags: ['safe'],
+    { t: '"학교도 붙잡자. 떨어질 데는 있어야지."', meta: '안전망 확보 · 성장 −', risk: 'SAFE', parent: -1, injury: 0, tags: ['safe'],
       fx: (gg) => {
         gg.player.econ.household = clamp(gg.player.econ.household - gg.flags._hit * 0.7, 0, 100);
         gg.player.hidden.absorption -= 6; gg.player.willToPlay -= 6; gg.player.academic += 12; gg.flags.university = true;
@@ -1928,13 +1930,13 @@ ev({
   id: 'covid', once: true, when: (g) => g.world.year === 2020 && g.player.active && A(g) >= 25, w: () => 3000,
   body: (g) => `2020년 3월. 리그가 멈췄다.\n\n${g.player.club ? g.player.club.name : '소속팀'}이 전 선수 임금 삭감안을 통보했다. 무관중 경기가 언제까지 갈지 아무도 모른다.\n\n만 ${A(g)}세. 커리어에서 반년은 짧지 않다.`,
   choices: () => [
-    { t: '삭감안에 동의하고 팀에 협조한다.', meta: '연봉 −25% · 신뢰 ++', risk: 'SAFE', parent: 0, injury: 0, tags: ['loyalty'],
+    { t: '"서명하자. 지금 버티면 팀이 먼저 죽어."', meta: '연봉 −25% · 신뢰 ++', risk: 'SAFE', parent: 0, injury: 0, tags: ['loyalty'],
       fx: (gg) => { gg.player.econ.wageYear = round(gg.player.econ.wageYear * 0.75); gg.npcs.coach.trust += 14; gg.player.reputation += 3; },
       out: () => '주장단과 함께 삭감안에 서명했다. 팬들이 그걸 기억한다.' },
-    { t: '거부한다. 계약은 계약이다.', meta: '연봉 유지 · 신뢰 −18 · 평판 −', risk: 'HIGH', parent: -1, injury: 0, tags: ['pride', 'risk'],
+    { t: '"거부하자. 계약은 계약이잖아."', meta: '연봉 유지 · 신뢰 −18 · 평판 −', risk: 'HIGH', parent: -1, injury: 0, tags: ['pride', 'risk'],
       fx: (gg) => { gg.npcs.coach.trust -= 18; gg.player.reputation -= 6; gg.player.stress += 10; },
       out: () => '법적으로는 이겼다. 라커룸에서는 졌다.' },
-    { t: '봉쇄 기간 내내 혼자 몸을 만든다.', meta: '건강 ++ · 부상 위험 −', risk: 'SAFE', parent: 0, injury: 0, tags: ['discipline'],
+    { t: '"거실에서라도 하자. 재개되면 몸 된 놈이 뛰는 거야."', meta: '건강 ++ · 부상 위험 −', risk: 'SAFE', parent: 0, injury: 0, tags: ['discipline'],
       fx: (gg) => { gg.player.fitness = clamp(gg.player.fitness + 16, 0, 100); gg.player.hidden.injuryProne -= 6; gg.player.econ.wageYear = round(gg.player.econ.wageYear * 0.8); },
       out: () => '거실에서 매일 두 시간. 리그가 재개됐을 때 몸이 가장 좋은 선수 중 하나였다.' },
   ],
@@ -1953,13 +1955,13 @@ ev({
       `FIFA 규정상 A매치 메이저 대회에 출전하는 순간 이 선택은 영구히 닫힌다.`;
   },
   choices: (g) => [
-    { t: `${NT_NAME[g.player.secondNationality]} 대표팀을 선택한다.`, meta: '즉시 주전 · 메이저 대회 출전 가능', risk: 'MID', parent: 1, injury: 0, tags: ['risk'],
+    { t: `"${NT_NAME[g.player.secondNationality]}로 가자. 부르는 데서 뛰는 게 맞지."`, meta: '즉시 주전 · 메이저 대회 출전 가능', risk: 'MID', parent: 1, injury: 0, tags: ['risk'],
       fx: (gg) => {
         gg.player.ntTeam = gg.player.secondNationality; gg.player.reputation += 8;
         remember(gg, 'nt_switch', `${gg.world.year}년, 스페인 대신 ${NT_NAME[gg.player.ntTeam]} 대표팀을 선택했다.`, 0.85);
       },
       out: (gg) => `${NT_NAME[gg.player.ntTeam]} 유니폼을 입었다. 부모님이 그 경기를 보며 울었다.` },
-    { t: '스페인 대표팀을 끝까지 기다린다.', meta: '못 뽑힐 수도 있다', risk: 'HIGH', parent: 0, injury: 0, tags: ['pride'],
+    { t: '"기다리자. 이 유니폼이 아니면 의미가 없어."', meta: '못 뽑힐 가능성 있음', risk: 'HIGH', parent: 0, injury: 0, tags: ['pride'],
       fx: (gg) => { gg.player.trait.pride += 10; gg.flags.waitedESP = true; },
       out: () => '한 번도 부르지 않을 수도 있다. 그래도 이 유니폼이어야 했다.' },
   ],
@@ -1980,10 +1982,10 @@ ev({
         `예비 명단 마지막 줄에 있었다는 건 나중에 알았다.`;
   },
   choices: (g) => {
-    if (!g.flags._wcIn) return [{ t: 'TV로 본다.', meta: '자신감 − · 독기 +', risk: 'SAFE', parent: -1, injury: 0, tags: [],
+    if (!g.flags._wcIn) return [{ t: '"TV로 보자. 지금 할 수 있는 게 없어."', meta: '자신감 − · 독기 +', risk: 'SAFE', parent: -1, injury: 0, tags: [],
       fx: (gg) => { gg.player.confidence -= 10; gg.player.hidden.grit += 8; remember(gg, 'wc_missed', `${gg.world.year}년 월드컵 명단 탈락.`, 0.8); },
       out: () => '4년 뒤에는 서른이 넘는다. 그 계산을 하고 있는 자신이 싫었다.' }];
-    return [{ t: '대회에 나간다.', meta: '빅매치 멘탈에 따라 결과가 갈린다', risk: 'MID', parent: 2, injury: 1, tags: [],
+    return [{ t: '"나가자. 이거 하나 보고 여기까지 왔잖아."', meta: '빅매치 멘탈 판정', risk: 'MID', parent: 2, injury: 1, tags: [],
       fx: (gg) => {
         gg.player.ntLocked = true;
         const perf = gg.player.hidden.bigMatch + gg.rng.norm(0, 14);
@@ -2010,10 +2012,10 @@ ev({
     `기자들이 라커룸 앞에서 정치적 입장을 묻는다. 무슨 말을 해도 절반이 등을 돌린다.` +
     (ENV(g).immigrant ? '\n\n이민자 가정 출신이라는 점까지 같이 소환된다.' : ''),
   choices: () => [
-    { t: '입장을 밝힌다.', meta: '팔로워 ++ / 절반의 반발', risk: 'HIGH', parent: 0, injury: 0, tags: ['pride', 'risk'],
+    { t: '"말하자. 침묵도 어차피 대답으로 읽혀."', meta: '팔로워 ++ / 절반의 반발', risk: 'HIGH', parent: 0, injury: 0, tags: ['pride', 'risk'],
       fx: (gg) => { gg.player.reputation += gg.rng.chance(0.5) ? 8 : -8; gg.player.stress += 12; },
       out: () => '한쪽에서는 영웅이 됐고, 한쪽에서는 배신자가 됐다.' },
-    { t: '"저는 축구 선수입니다"로 넘긴다.', meta: '무난 · 스트레스 −', risk: 'SAFE', parent: 0, injury: 0, tags: ['safe'],
+    { t: '"저는 축구 선수입니다 — 그 한 줄로 넘기자."', meta: '무난 · 스트레스 −', risk: 'SAFE', parent: 0, injury: 0, tags: ['safe'],
       fx: (gg) => { gg.player.stress -= 4; },
       out: () => '가장 안전한 문장을 골랐다. 아무도 만족하지 않았지만 아무도 화내지 않았다.' },
   ],
@@ -2026,7 +2028,7 @@ ev({
     return `이번 주말 상대는 FC 바르셀로나다.\n\n${m.age}세였던 ${m.year}년, 그곳에서 떨어졌다.\n리포트에는 "지금 우리 시스템에 넣어야 할 필연성이 낮다"고 적혀 있었다.\n\n그때 평가서를 쓴 스카우트는 지금도 그 조직에 있다.`;
   },
   choices: () => [
-    { t: '이 한 경기에 모든 것을 건다.', meta: '빅매치 멘탈 판정', risk: 'HIGH', parent: 1, injury: 1, tags: ['pride'],
+    { t: '"이 경기에 다 걸자. 10년 기다렸어."', meta: '빅매치 멘탈 판정', risk: 'HIGH', parent: 1, injury: 1, tags: ['pride'],
       fx: (gg) => {
         const perf = gg.player.hidden.bigMatch + gg.player.hidden.grit * 0.4 + gg.rng.norm(0, 16);
         if (perf > 75) { gg.player.reputation += 14; gg.player.confidence += 20; gg.flags.revengeDone = true; remember(gg, 'revenge', `${gg.world.year}년, 나를 떨어뜨린 팀을 상대로 인생 경기를 했다.`, 0.95); }
@@ -2035,7 +2037,7 @@ ev({
       out: (gg) => gg.flags.revengeDone
         ? '골을 넣고 관중석 쪽을 한참 봤다. 누구를 보는지는 나만 알았다.'
         : '90분 동안 공을 다섯 번 잡았다. 경기 후 아무도 그 얘기를 꺼내지 않았다.' },
-    { t: '평소처럼 한다. 20년 전 일이다.', meta: '스트레스 − · 폼 +', risk: 'SAFE', parent: 0, injury: 0, tags: ['discipline'],
+    { t: '"평소처럼 하자. 20년 전 일이잖아."', meta: '스트레스 − · 폼 +', risk: 'SAFE', parent: 0, injury: 0, tags: ['discipline'],
       fx: (gg) => { gg.player.stress -= 8; gg.player.form += 5; },
       out: () => '경기가 끝나고 나서야, 손이 떨렸다는 걸 알았다.' },
   ],
@@ -2045,10 +2047,10 @@ ev({
   id: 'captaincy', once: true, when: (g) => A(g) >= 25 && g.player.active && g.player.club && g.npcs.coach.trust > 68 && g.player.reputation > 40, w: () => 130,
   body: (g) => `감독이 주장 완장을 제안한다. ${g.player.club.name}에서 가장 오래된 선수가 됐다는 뜻이기도 하다.`,
   choices: () => [
-    { t: '받는다.', meta: '빅매치 멘탈 + · 스트레스 +', risk: 'MID', parent: 2, injury: 0, tags: ['pride'],
+    { t: '"완장 받자. 이제 그럴 나이지."', meta: '빅매치 멘탈 + · 스트레스 +', risk: 'MID', parent: 2, injury: 0, tags: ['pride'],
       fx: (gg) => { gg.flags.captain = true; gg.player.hidden.bigMatch += 8; gg.player.reputation += 6; gg.player.stress += 12; gg.player.career.trophies.push(`${gg.player.club.name} 주장`); shiftReaction(gg, 1, '주장 선임'); },
       out: (gg) => { remember(gg, 'captain', `${gg.world.year}년 ${gg.player.club.name} 주장이 됐다.`, 0.8); return '완장을 차고 처음 라커룸에서 말을 했다. 목소리가 떨렸다.'; } },
-    { t: '거절한다. 내 경기에 집중하고 싶다.', meta: '스트레스 − · 신뢰 −', risk: 'SAFE', parent: 0, injury: 0, tags: ['safe'],
+    { t: '"거절하자. 내 경기부터 챙겨야 해."', meta: '스트레스 − · 신뢰 −', risk: 'SAFE', parent: 0, injury: 0, tags: ['safe'],
       fx: (gg) => { gg.player.stress -= 6; gg.npcs.coach.trust -= 6; },
       out: () => '완장은 다른 선수에게 갔다.' },
   ],
@@ -2059,13 +2061,13 @@ ev({
   body: (g) => `축구를 계속할 이유를 못 찾겠다.\n\n출전 시간은 줄고, 몸은 아프고, 같이 시작한 애들 절반은 이미 그만뒀다.\n` +
     `${g.npcs.mother.name}이 조용히 다른 얘기를 꺼낸다.\n\n(축구 의지 ${round(g.player.willToPlay)}/100 · 학업 ${round(g.player.academic)}/100)`,
   choices: () => [
-    { t: '그만둔다.', meta: '커리어 종료', risk: 'HIGH', parent: 0, injury: 0, tags: ['safe'],
+    { t: '"그만두자. 더 붙잡을 이유를 못 찾겠어."', meta: '커리어 종료', risk: 'HIGH', parent: 0, injury: 0, tags: ['safe'],
       fx: (gg) => { gg.player.active = false; gg.player.path.push(`${gg.world.year} 축구 중단`); remember(gg, 'quit', `${gg.world.year}년, ${A(gg)}세에 축구를 그만뒀다.`, 1.0); },
       out: () => '축구화를 신발장 맨 아래로 밀어 넣었다. 그날 밤 오래 잤다.' },
-    { t: '한 시즌만 더 해본다.', meta: '축구 의지 +18', risk: 'MID', parent: 0, injury: 0, tags: ['discipline'],
+    { t: '"한 시즌만 더 해보자."', meta: '축구 의지 +18', risk: 'MID', parent: 0, injury: 0, tags: ['discipline'],
       fx: (gg) => { gg.player.willToPlay += 18; gg.player.stress += 6; },
       out: () => '"한 시즌만." 이 말을 앞으로 몇 번 더 하게 된다.' },
-    { t: '수준을 낮춰서라도 매주 뛸 수 있는 팀으로 간다.', meta: '3부 이적 · 출전 확보', risk: 'SAFE', parent: -1, injury: 0, tags: ['adaptability'],
+    { t: '"수준 낮춰서라도 뛰자. 벤치에서 썩는 게 더 무서워."', meta: '3부 이적 · 출전 확보', risk: 'SAFE', parent: -1, injury: 0, tags: ['adaptability'],
       fx: (gg) => {
         gg.player.willToPlay += 14;
         const low = CLUBS.filter((c) => c.nat === 'ESP' && c.div === 3);
@@ -2079,10 +2081,10 @@ ev({
   id: 'aging', when: (g) => A(g) >= 30 && g.player.active && g.player.club, w: () => 150,
   body: (g) => `만 ${A(g)}세. 회복이 느려졌다. 경기 다음 날 종아리가 이틀을 아프다.\n\n${g.player.club.name} · 현재 능력 ${ability(g)} · 누적 자산 ${fmtMoney(g.player.econ.assets)}`,
   choices: () => [
-    { t: '주전 경쟁을 계속한다.', meta: '스트레스 + · 부상 위험 +', risk: 'HIGH', parent: 0, injury: 2, tags: ['pride'],
+    { t: '"아직 안 밀렸어. 계속 붙자."', meta: '스트레스 + · 부상 위험 +', risk: 'HIGH', parent: 0, injury: 2, tags: ['pride'],
       fx: (gg) => { gg.player.stress += 12; gg.npcs.coach.trust -= 4; gg.player.hidden.injuryProne += 6; },
       out: () => '아직 진 게 아니다. 다만 예전보다 훨씬 아프다.' },
-    { t: '베테랑 역할을 받아들인다.', meta: '신뢰 ++ · 부상 위험 −', risk: 'SAFE', parent: 0, injury: 0, tags: ['adaptability'],
+    { t: '"20분씩 나가는 것도 역할이지. 받아들이자."', meta: '신뢰 ++ · 부상 위험 −', risk: 'SAFE', parent: 0, injury: 0, tags: ['adaptability'],
       fx: (gg) => { gg.npcs.coach.trust += 14; gg.player.stress -= 10; gg.player.hidden.injuryProne -= 6; gg.flags.veteran = true; },
       out: () => '20분씩 나가서 경기를 정리한다. 어린 선수들이 질문을 하러 온다.' },
   ],
@@ -2097,7 +2099,7 @@ ev({
       `"${m.year}년에 네가 성적 유지한다고 해서 축구 시켜준 거 기억나냐."\n\n잠시 말이 없다가,\n\n"그때 내가 반대만 했으면… 지금 너는 어디 있었을까 싶다."`;
   },
   choices: () => [
-    { t: '"허락해줘서 여기까지 온 거예요."', meta: '스트레스 −− · 관계 회복', risk: 'SAFE', parent: 1, injury: 0, tags: ['family'],
+    { t: '"아버지가 허락해줘서 여기까지 온 거예요."', meta: '스트레스 −− · 관계 회복', risk: 'SAFE', parent: 1, injury: 0, tags: ['family'],
       fx: (gg) => { gg.player.stress -= 14; gg.flags.fatherResolved = true; shiftReaction(gg, 1, '아버지와 화해'); },
       out: (gg) => { remember(gg, 'father_resolved', '아버지와 화해했다. 30년 걸렸다.', 0.95); return '아버지가 고개를 끄덕이고 접시를 치웠다. 그게 그 사람의 방식이다.'; } },
     { t: '"저는 허락 없어도 했을 거예요."', meta: '자존심 +', risk: 'MID', parent: 0, injury: 0, tags: ['pride'],
@@ -2110,11 +2112,11 @@ ev({
   id: 'retirement', when: (g) => A(g) >= 33 && g.player.active, w: (g) => 80 + (A(g) - 33) * 120 + (g.player.ovr < 58 ? 90 : 0),
   body: (g) => `만 ${A(g)}세. 은퇴를 생각하기 시작했다.\n\n통산 ${g.player.career.apps}경기 ${g.player.career.goals}골 ${g.player.career.assists}도움 · A매치 ${g.player.career.caps}경기\n누적 자산 ${fmtMoney(g.player.econ.assets)}`,
   choices: () => [
-    { t: '한 시즌 더 뛴다.', meta: '능력 하락 계속', risk: 'MID', parent: 0, injury: 2, tags: ['pride'], fx: () => {}, out: () => '"마지막 한 시즌." 이 말도 몇 번째다.' },
-    { t: '이번 시즌을 마지막으로 정하고 은퇴를 발표한다.', meta: '평판 + · 커리어 종료', risk: 'SAFE', parent: 0, injury: 0, tags: ['discipline'],
+    { t: '"한 시즌 더 뛰자. 아직 걸을 수 있잖아."', meta: '능력 하락 계속', risk: 'MID', parent: 0, injury: 2, tags: ['pride'], fx: () => {}, out: () => '"마지막 한 시즌." 이 말도 몇 번째다.' },
+    { t: '"이번 시즌으로 끝내자. 질질 끄는 건 싫어."', meta: '평판 + · 커리어 종료', risk: 'SAFE', parent: 0, injury: 0, tags: ['discipline'],
       fx: (gg) => { gg.flags.farewell = true; gg.player.reputation += 6; },
       out: () => '발표한 다음 경기, 원정 관중석에서도 박수가 나왔다.' },
-    { t: '지도자 자격증을 준비하며 마무리한다.', meta: '은퇴 후 지도자 트랙', risk: 'SAFE', parent: 1, injury: 0, tags: ['adaptability'],
+    { t: '"자격증 준비하자. 축구 안에 남고 싶어."', meta: '은퇴 후 지도자 트랙', risk: 'SAFE', parent: 1, injury: 0, tags: ['adaptability'],
       fx: (gg) => { gg.flags.coachingLicense = true; gg.flags.farewell = true; },
       out: (gg) => { remember(gg, 'coaching', 'UEFA 지도자 코스를 시작했다.', 0.7); return '전술 노트를 다시 쓰기 시작했다. 이번에는 남을 위해서.'; } },
   ],
@@ -2132,7 +2134,7 @@ ev({
   },
   choices: (g) => {
     const list = [
-      { t: '학업/직업 훈련에 집중한다.', meta: '평범한 삶의 안전망 · 드물게 크게 성공', risk: 'SAFE', parent: 1, injury: 0, tags: ['safe'],
+      { t: '"뭐라도 배우자. 이대로 있으면 안 돼."', meta: '평범한 삶의 안전망 · 드물게 크게 성공', risk: 'SAFE', parent: 1, injury: 0, tags: ['safe'],
         fx: (gg) => {
           gg.flags.drifting = false;
           gg.player.econ.assets += 14000;
@@ -2143,10 +2145,10 @@ ev({
         out: (gg) => gg.flags.lifeTrack === 'SUCCESS'
           ? '공을 놓은 손으로 다른 것을 잡았다. 몇 년 뒤 그게 더 커진다.'
           : '평범한 삶이 생각보다 나쁘지 않다.' },
-      { t: '동네 팀에서 취미로 계속 찬다.', meta: '스트레스 − · 평범한 트랙', risk: 'SAFE', parent: 0, injury: 0, tags: [],
+      { t: '"동네 팀에서라도 차자. 그게 그냥 축구지."', meta: '스트레스 − · 평범한 트랙', risk: 'SAFE', parent: 0, injury: 0, tags: [],
         fx: (gg) => { gg.player.willToPlay += 14; gg.player.stress -= 10; gg.flags.drifting = false; gg.flags.lifeTrack = gg.flags.lifeTrack || 'NORMAL'; },
         out: () => '수요일 저녁 리그. 아무도 스카우트하지 않지만, 이게 축구다.' },
-      { t: '아무것도 하지 않는다.', meta: '표류 · Bad End 위험', risk: 'HIGH', parent: -1, injury: 0, tags: [],
+      { t: '"아무것도 하지 말자. 지금은 못 하겠어."', meta: '표류 · Bad End 위험', risk: 'HIGH', parent: -1, injury: 0, tags: [],
         fx: (gg) => { gg.player.stress += 14; gg.flags.drifting = true; gg.flags.lifeTrack = 'BAD'; },
         out: () => '낮과 밤이 뒤집혔다. 동네 사람들이 뭐라고 하는지는 안다.' },
     ];
@@ -2239,7 +2241,7 @@ export function beginTurn(g) {
   if (!picked) {
     if (age <= 11) { pushLog(g, 'system', '별일 없이 한 해가 지나갔다.'); advanceClock(g); return beginTurn(g); }
     g.pending = { id: 'quiet', body: '특별한 일 없이 지나갔다. 커리어의 대부분은 이런 기간이다.',
-      choices: [{ t: '다음 기간으로.', risk: 'SAFE', parent: 0, injury: 0, tags: [], fx: () => {}, out: () => '' }] };
+      choices: [{ t: '"넘기자."', risk: 'SAFE', parent: 0, injury: 0, tags: [], fx: () => {}, out: () => '' }] };
     return g;
   }
   setPending(g, picked.e);
