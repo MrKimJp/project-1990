@@ -492,8 +492,9 @@ export function newGame(opts = {}) {
     { w: 14, v: 'AM' }, { w: 16, v: 'WG' }, { w: 13, v: 'ST' },
   ]).v;
 
-  // 난이도 하향: 잠재력 분포를 상향한다 (1부 정착 40~50% 목표)
-  const potential = clamp(round(63 + rng.rightSkew(1.55) * 36 + rng.norm(0, 2)), 58, 99);
+  // 잠재력은 균등분포. 58~99 사이 어떤 값도 같은 확률로 나온다.
+  // (우편향으로 두면 대부분이 저잠재력에 몰려 성장 속도 차이가 잘 드러나지 않는다)
+  const potential = rng.int(58, 99);
 
   // 초기 부모 반응 — 성향 + 가정환경의 안전망 압력으로 결정된다
   let react = 1 + pers.bias - (env.safety > 70 ? 1 : 0);
@@ -1207,7 +1208,7 @@ function ballonDorCheck(g, club, ucl, rating, goals, apps, share, ntRes) {
   score += g.rng.norm(0, 9);
 
   // 발롱도르는 전 세계에서 매년 한 명이다. 자격을 갖췄어도 대부분은 다른 후보에게 밀린다.
-  if (score > 70 && g.rng.chance(clamp((score - 66) / 90, 0.06, 0.5))) {
+  if (score > 70 && g.rng.chance(clamp((score - 70) / 105, 0.05, 0.36))) {
     p.awards.ballonDor += 1;
     p.career.trophies.push(`${g.world.year} 발롱도르 수상`);
     remember(g, 'ballon', `${g.world.year}년 발롱도르를 받았다.`, 1.0);
@@ -2692,7 +2693,7 @@ export function classify(g) {
   // 프로 6티어
   // T1은 발롱도르로 잠근다 — 난이도를 낮춰도 GOAT가 흔해지지 않게
   if (p.awards.ballonDor >= 1) return 'T1';
-  if (div === 1 && rep >= 84 && peakRep > 70 && apps > 320) return 'T2';   // 빅클럽 주축
+  if (div === 1 && rep >= 87 && peakRep > 74 && apps > 380) return 'T2';   // 빅클럽 주축
   if (div === 1 && apps > 285) return 'T3';                                  // 1부 정착
   if (div === 1 && apps > 40) return 'T4';                                   // 1부를 밟았으나 정착 실패
   if (apps > 200) return 'T5';
