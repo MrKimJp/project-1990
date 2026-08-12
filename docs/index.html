@@ -266,6 +266,8 @@ function makeRng(seed) {
 }
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+/** 만 16세 시작 능력 — 전원 동일 */
+const START_OVR = 50;
 const round = Math.round;
 const sigmoid = (x) => 1 / (1 + Math.exp(-x));
 const fmtMoney = (v) =>
@@ -798,6 +800,11 @@ function runBackstory(g) {
     g.world.phase = 'SUMMER';
   }
   g.flags._inBackstory = false;
+  // 시작 능력은 전원 50으로 고정한다. 배경설정은 소속 팀과 훈련 환경(devEnv)을 통해서만
+  // 작동하고, 이후 성장 속도는 잠재력이 결정한다.
+  g.player.ovr = START_OVR;
+  g.player.peakOvr = START_OVR;
+
   const prose = buildBackstory(g);
   g.backstory = prose;
   // 유년기 턴 로그를 지우고 배경설정으로 대체한다
@@ -990,10 +997,24 @@ function trainingQuality(g) {
 }
 
 /** 환경 천장 — 잠재력은 환경이 허락하는 만큼만 열린다 */
+/**
+ * 잠재력 → 성장 속도 계수.
+ * 전원이 50에서 출발하므로, 갈라지는 것은 "얼마나 빨리 자라는가"다.
+ *   잠재력 95 → ×1.35 (17세부터 폭발)
+ *   잠재력 75 → ×1.00
+ *   잠재력 58 → ×0.75 (느리고 일찍 정지)
+ * 이 수치는 플레이어에게 공개되지 않는다.
+ */
+function growthSpeed(p) {
+  return clamp(0.75 + (p.hidden.potential - 58) * 0.01622, 0.6, 1.45);
+}
+
 function developmentCeiling(p) {
   const env = p.devEnv ?? 52;
-  // 난이도 하향: 나쁜 환경에서도 재능이 더 많이 열린다 (하한 0.52 → 0.72)
-  return p.hidden.potential * clamp(0.72 + 0.28 * clamp((env - 30) / 55, 0, 1), 0.72, 1);
+  const raw = p.hidden.potential * clamp(0.72 + 0.28 * clamp((env - 30) / 55, 0, 1), 0.72, 1);
+  // 전원이 50에서 출발하므로 천장이 50 아래로 계산되면 아예 성장하지 못한다.
+  // 최소한 시작점보다는 위에 두어, 잠재력이 낮은 선수도 조금은 자라게 한다.
+  return Math.max(raw, START_OVR + 3);
 }
 
 const GREW = [
@@ -1031,7 +1052,7 @@ function applyGrowth(g) {
   const noise = 0.55 + g.rng.rightSkew(1.35) * 1.5;
   const stressPen = 1 - clamp(p.stress - 45, 0, 55) / 130;
   const injPen = p.injuryWeeks > 8 ? 0.55 : p.injuryWeeks > 0 ? 0.82 : 1;
-  const delta = clamp(years * curve * (gap / 100) * mult * noise * 6.4 * stressPen * injPen, 0, 14);
+  const delta = clamp(years * curve * (gap / 100) * mult * noise * growthSpeed(p) * 6.4 * stressPen * injPen, 0, 14);
   p.ovr = clamp(p.ovr + delta, 0, 99);
   p.peakOvr = Math.max(p.peakOvr, p.ovr);
 
@@ -1056,7 +1077,9 @@ function matchesInPeriod(g) {
   const age = ageOf(g);
   if (age < 10) return 0;
   const base = age < 16 ? 24 : (g.player.club && g.player.club.div === 1 && g.player.club.rep > 80 ? 44 : 36);
-  return round(base * periodYears(g));
+  // 2020년은 리그가 실제로 중단됐다 — 경기 수가 줄어든다
+  const disruption = g.world.year === 2020 ? 0.72 : 1;
+  return round(base * periodYears(g) * disruption);
 }
 
 /** 승격·강등으로 소속 부가 바뀌면 그 부의 리그를 기준으로 순위를 매긴다 */
@@ -1528,8 +1551,9 @@ function generateOffers(g, count = 3) {
     const avg = teamAvgAt(c, g.world.year);
     const youthDiscount = age <= 21 ? 8 : 0;   // 유망주 할인
     if (scoutedValue(g, c) < avg - 10 - youthDiscount) return false;
-    // 성인 프로 계약의 절대 하한
-    if (age >= 16 && p.ovr < 52) return false;
+    // 성인 프로 계약의 절대 하한. 16~17세는 유망주 계약이므로 면제한다
+    // (전원 50에서 출발하기 때문에 하한을 걸면 이 나이대 오퍼가 전부 막힌다).
+    if (age >= 18 && p.ovr < 52) return false;
     if (p.ovr > avg + 16 && c.div >= 3) return false;
 
     // ── 내 수준보다 낮은 팀은 나를 데려갈 이유가 없다 (영구 이적에만 적용, 임대는 별도 규칙)
@@ -2594,6 +2618,51 @@ ev({
   },
 });
 
+/* ─────────────────────────── 12-b. 역사 이벤트의 영향 설명 ─────────────────── */
+
+/**
+ * 역사 이벤트가 이번 기간에 실제로 무엇을 바꾸는지 서술한다.
+ * 여기 적히는 항목은 전부 엔진에 실제로 구현된 효과여야 한다 —
+ * 설명과 동작이 어긋나면 그게 더 나쁘다.
+ */
+function historyImpact(g, h) {
+  const y = g.world.year;
+  const p = g.player;
+  const f = g.npcs.father;
+  const L = [];
+
+  if (h.money && h.money < 0) {
+    L.push(`가계 ${h.money} → 현재 가계 ${round(p.econ.household)}/100. ` +
+      `${f.name}의 일(${f.status === '실직' ? '실직 상태' : f.job})이 직접 영향권에 들어간다.`);
+    if (p.econ.household < 30) L.push('가계가 30 미만이라, 앞으로의 선택에서 안전한 쪽(돈)이 계속 끌어당긴다.');
+  } else if (h.money && h.money > 0) {
+    L.push(`가계 +${h.money} → 현재 ${round(p.econ.household)}/100. 일자리가 늘어난다.`);
+  }
+  if (h.boom) L.push(`축구 열기 +${h.boom} — 유소년 등록과 스카우팅 활동이 늘어난다.`);
+
+  const clim = marketClimate(g);
+  if (clim.global) {
+    L.push(`이적시장 동결 — 팀 평균 ${BIG_CLUB_AVG} 미만 구단의 오퍼가 대부분 사라진다. ` +
+      `돈이 있는 빅클럽만 예외다.`);
+    L.push('재계약 주급 동결 — 빅클럽 소속이 아니면 이번 재계약에서 인상이 없다.');
+  }
+  if (clim.domestic) {
+    L.push('스페인 구단 자금난 — 자국 오퍼가 줄고 해외 오퍼가 늘어난다. ' +
+      '구단이 나를 붙잡을 이유도 줄어서 이적 거부율이 내려간다.');
+  }
+  if (y === 2020) L.push('무관중·일정 중단 — 이번 시즌 경기 수와 주급 모두 영향을 받는다.');
+  if (y === 2023) {
+    L.push('사우디 리그 자금 유입 — 능력 80 이상이면 나이와 무관하게, ' +
+      '현 주급의 5배 규모 제안이 들어올 수 있다.');
+  }
+  if (WORLD_CUP_YEARS.includes(y) || EURO_YEARS.includes(y)) {
+    L.push(p.ntTeam
+      ? `${NT_NAME[p.ntTeam]} 대표팀 소속 — 이번 대회 성적이 평판과 발롱도르 판정에 직접 반영된다.`
+      : '대표팀에 뽑히지 않은 상태다 — 이번 대회는 나와 무관하게 지나간다.');
+  }
+  return L;
+}
+
 /* ─────────────────────────── 13. 턴 루프 ─────────────────────────── */
 
 function eligible(g) {
@@ -2638,9 +2707,12 @@ function beginTurn(g) {
   const h = HISTORY[g.world.year];
   if (h && g.world.phase === 'SUMMER' && !g.flags[`_h${g.world.year}`]) {
     g.flags[`_h${g.world.year}`] = true;
-    pushLog(g, 'history', h.t.map((x) => `◆ ${x}`).join('\n'));
     if (h.money) g.player.econ.household = clamp(g.player.econ.household + h.money, 0, 100);
     if (h.boom) g.world.boom += h.boom;
+    const impact = historyImpact(g, h);
+    pushLog(g, 'history',
+      h.t.map((x) => `◆ ${x}`).join('\n') +
+      (impact.length ? `\n\n[이번 기간에 미치는 영향]\n` + impact.map((x) => `· ${x}`).join('\n') : ''));
   }
 
   // 부모 상태 갱신 — 실직 후 재취업하거나, 나이가 차면 은퇴한다
@@ -2838,7 +2910,7 @@ function classify(g) {
   // T1은 발롱도르로 잠근다 — 난이도를 낮춰도 GOAT가 흔해지지 않게
   if (p.awards.ballonDor >= 1) return 'T1';
   if (div === 1 && rep >= 84 && peakRep > 70 && apps > 320) return 'T2';   // 빅클럽 주축
-  if (div === 1 && apps > 230) return 'T3';                                  // 1부 정착
+  if (div === 1 && apps > 285) return 'T3';                                  // 1부 정착
   if (div === 1 && apps > 40) return 'T4';                                   // 1부를 밟았으나 정착 실패
   if (apps > 200) return 'T5';
   return 'T6';
