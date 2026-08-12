@@ -603,7 +603,9 @@ function salaryFor(club, ovr, year, rep) {
   const abilityMul = 0.45 + clamp(ovr - club.req + 12, 0, 34) / 30;
   const fameMul = 0.8 + rep / 180;
   const era = clamp(0.34 + (year - 2000) * 0.033, 0.3, 1.2);
-  return round(base * repMul * abilityMul * fameMul * era);
+  // 2023년 이후 사우디 리그의 자금 유입. 축구적 수준과 무관하게 주급만 폭등한다.
+  const saudiBoom = club.nat === 'SAU' && year >= 2023 ? 7 : 1;
+  return round(base * repMul * abilityMul * fameMul * era * saudiBoom);
 }
 
 const NT_BAR = { ESP: 92, MAR: 62, SEN: 60, COL: 70, ECU: 60, ROU: 58, ARG: 90, DOM: 48 };
@@ -1230,7 +1232,12 @@ function simulatePeriod(g) {
       ach.push(`UCL ${ucl.label}`);
       pushLog(g, 'ucl', `챔피언스리그 ${ucl.label}. 평판 +${ucl.gain}.`);
     }
-    const bd = ballonDorCheck(g, club, ucl, rating, goals, apps);
+    const ntRes = ntTournament(g);
+    if (ntRes) {
+      ach.push(`${ntRes.comp} ${ntRes.label}`);
+      pushLog(g, 'nt', `${NT_NAME[g.player.ntTeam]} 대표팀 ${ntRes.comp} ${ntRes.label}. ${ntRes.caps}경기 출전.`);
+    }
+    const bd = ballonDorCheck(g, club, ucl, rating, goals, apps, share, ntRes);
     if (bd === 'WIN') { ach.push('발롱도르 수상'); pushLog(g, 'award', `◆ ${g.world.year} 발롱도르 수상. 이 시즌은 영구히 기록된다.`); }
     else if (bd === 'TOP3') { ach.push('발롱도르 후보'); pushLog(g, 'award', `${g.world.year} 발롱도르 최종 후보 3인에 들었다.`); }
   }
@@ -1245,6 +1252,7 @@ function simulatePeriod(g) {
     size: finishRec ? finishRec.size : null,
     ucl: uclRec ? uclRec.label : null,
     ntCaps: 0,                                   // nationalTeamCheck 에서 이 기간 출전분만 채운다
+    ntResult: null,                              // 국가대항전 성적
     ntName: p.ntTeam ? NT_NAME[p.ntTeam] : null,
   });
 
@@ -1290,6 +1298,49 @@ function simulatePeriod(g) {
 /* ─────────────────────────── 9-b. 챔피언스리그 / 개인 수상 ─────────────────── */
 
 const UCL_ROUND = ['조별리그 탈락', '16강', '8강', '4강', '준우승', '우승'];
+const TOURN_ROUND = ['조별 탈락', '16강', '8강', '4강', '준우승', '우승'];
+/** 유로 개최 연도 (주인공이 성인인 구간) */
+const EURO_YEARS = [2008, 2012, 2016, 2021, 2024];
+/** 실제 우승 기록 — 해당 연도 대표팀에 가중을 준다 */
+const NT_TITLE_HISTORY = { ESP: { 2008: 1, 2010: 1, 2012: 1, 2024: 1 }, ARG: { 2022: 1 }, MAR: {}, SEN: { 2022: 0 } };
+/** 유로에 나가는 국가 */
+const EURO_NATIONS = new Set(['ESP', 'ROU']);
+
+/**
+ * 국가대항전(월드컵·유로) 성적. 발롱도르 최소 조건이자 시즌표의 '국가대항전' 열이 된다.
+ */
+function ntTournament(g) {
+  const p = g.player;
+  const y = g.world.year;
+  const isWC = WORLD_CUP_YEARS.includes(y);
+  const isEuro = EURO_YEARS.includes(y);
+  if ((!isWC && !isEuro) || !p.ntTeam || !ntEligible(g)) return null;
+  if (isEuro && !EURO_NATIONS.has(p.ntTeam)) return null;
+
+  const comp = isWC ? '월드컵' : '유로';
+  const bar = NT_BAR[p.ntTeam] ?? 70;
+  // 스쿼드 진입 자체가 먼저다
+  if (p.ovr + p.reputation * 0.3 < bar - 2) return null;
+
+  let strength = (bar - 62) / 6 + (p.reputation - 60) / 13 + (p.hidden.bigMatch - 50) / 16 + g.rng.norm(0, 1.6);
+  if ((NT_TITLE_HISTORY[p.ntTeam] || {})[y]) strength += 2.4;   // 실제 역사 가중
+  const reach = clamp(Math.round(1 + strength), 0, 5);
+
+  const caps = g.rng.int(3, 7);
+  p.career.caps += caps;
+  const goals = round(caps * POSITIONS[p.position].goal * 0.5 * g.rng.f() * 1.6);
+  p.career.ntGoals += goals;
+  recordCaps(g, caps, p.ntTeam);
+
+  const gain = [0, 2, 4, 7, 10, 15][reach];
+  p.reputation = clamp(p.reputation + gain, 0, 100);
+  p.peakReputation = Math.max(p.peakReputation, p.reputation);
+  if (reach === 5) {
+    p.career.trophies.push(`${y} ${comp} 우승`);
+    remember(g, 'nt_title', `${y}년 ${NT_NAME[p.ntTeam]} 대표팀으로 ${comp}에서 우승했다.`, 1.0);
+  }
+  return { comp, label: TOURN_ROUND[reach], reach, caps, goals };
+}
 
 /** 유럽대항전 — 소속 클럽의 그 해 명성으로 진출과 성적을 정한다 */
 function simulateEurope(g, club, apps, total, rating) {
@@ -1317,9 +1368,16 @@ function simulateEurope(g, club, apps, total, rating) {
  * 발롱도르 — 매년 1명. 목표 수상 확률은 커리어당 약 5%.
  * 클럽 수준·UCL 성적·평판·대표팀 성적을 합산한 점수로 판정한다.
  */
-function ballonDorCheck(g, club, ucl, rating, goals, apps) {
+function ballonDorCheck(g, club, ucl, rating, goals, apps, share, ntRes) {
   const p = g.player;
   if (!club || club.div !== 1) return null;
+
+  // ── 최소 조건: 팀이 UCL 또는 국가대항전에서 우승했고, 본인이 주전이어야 한다.
+  //    첼시 백업이 후보 3위에 드는 일이 없게 만드는 게 이 게이트의 목적이다.
+  const majorTitle = (ucl && ucl.reach === 5) || (ntRes && ntRes.reach === 5);
+  const starter = share >= 0.70 && p.ovr >= teamAvgAt(club, g.world.year);
+  if (!majorTitle || !starter) return null;
+
   const rep = clubRepAt(club, g.world.year);
   if (rep < 84 || p.reputation < 82) return null;
 
@@ -1329,7 +1387,8 @@ function ballonDorCheck(g, club, ucl, rating, goals, apps) {
   if (g.flags.wcHero) score += 12;
   score += g.rng.norm(0, 9);
 
-  if (score > 70) {
+  // 발롱도르는 전 세계에서 매년 한 명이다. 자격을 갖췄어도 대부분은 다른 후보에게 밀린다.
+  if (score > 70 && g.rng.chance(clamp((score - 66) / 90, 0.06, 0.5))) {
     p.awards.ballonDor += 1;
     p.career.trophies.push(`${g.world.year} 발롱도르 수상`);
     remember(g, 'ballon', `${g.world.year}년 발롱도르를 받았다.`, 1.0);
@@ -1441,7 +1500,7 @@ function fitLabel(g, club) {
   return { label: '전력 외', d, avg };
 }
 
-function generateOffers(g, count = 6) {
+function generateOffers(g, count = 3) {
   const p = g.player;
   const age = ageOf(g);
   const clim = marketClimate(g);
@@ -1460,6 +1519,12 @@ function generateOffers(g, count = 6) {
     if (age >= 16 && p.ovr < 52) return false;
     if (p.ovr > avg + 16 && c.div >= 3) return false;
 
+    // ── 내 수준보다 낮은 팀은 나를 데려갈 이유가 없다 (영구 이적에만 적용, 임대는 별도 규칙)
+    //    유일한 예외: 사우디 리그가 능력 80+ 선수에게 현 주급의 5배를 제시하는 경우
+    const saudiMoney = c.nat === 'SAU' && p.ovr >= 80 &&
+      salaryFor(c, p.ovr, g.world.year, p.reputation) >= Math.max(1, p.econ.wageYear) * 5;
+    if (avg < p.ovr && !saudiMoney) return false;
+
     // ── 문제 2: 팀 평균이 ±5 이내로 비슷한 구단으로는 이적하지 않는다 (매각 메리트 없음)
     //    예외: 직전 시즌 출전이 30% 미만이면 "안 뛰니 보낸다" 로직으로 동급 이적 허용
     if (myAvg != null && Math.abs(avg - myAvg) <= 5 && !benched) return false;
@@ -1469,7 +1534,9 @@ function generateOffers(g, count = 6) {
     if (c.nat !== 'ESP') {
       if (age < 18 && g.world.year >= 2001) return false; // FIFA 18세 미만 국제이적 제한
       if (p.reputation < 26 && age < 22) return false;
-      if (['SAU', 'KOR', 'JPN', 'MLS', 'USA'].includes(c.nat) && age < 28) return false; // 이 리그들은 보통 커리어 후반부
+      // 이 리그들은 보통 커리어 후반부에 열린다. 단 사우디는 능력 80+ 에게는 나이와 무관하게 접근한다.
+      if (['KOR', 'JPN', 'MLS', 'USA'].includes(c.nat) && age < 28) return false;
+      if (c.nat === 'SAU' && age < 28 && p.ovr < 80) return false;
     }
     return true;
   });
@@ -1558,7 +1625,7 @@ function joinClub(g, club, opts = {}) {
   p.contractUntil = opts.loanFrom
     ? p.contractUntil
     : g.world.year + (opts.years ?? (ageOf(g) < 20 ? 3 : 4));
-  g.npcs.coach = { trust: clamp(48 + g.rng.norm(0, 9) + (opts.wanted ? 10 : 0), 10, 90) };
+  g.npcs.coach = { trust: clamp(48 + g.rng.norm(0, 9) + (opts.wanted ? 10 : 0), 10, 90), unknown: false };
   p.stress = clamp(p.stress + clamp((club.comp - 65) / 6 - (p.hidden.adaptability - 50) / 8, -6, 14), 0, 100);
   p.path.push(`${g.world.year} ${club.name}${opts.loanFrom ? ' (임대)' : ''}`);
   pushLog(g, 'transfer', `${club.name} 합류 — ${club.league} (${DIV_LABEL[club.div]}) · 클럽 명성 ${club.rep}`);
@@ -1930,7 +1997,7 @@ ev({
   id: 'summer_market', when: (g) => g.world.phase === 'SUMMER' && A(g) >= 16 && g.player.active && !(A(g) >= 18 && (!g.player.club || g.player.club.youth)), w: () => 100,
   body: (g) => {
     const p = g.player;
-    const offers = generateOffers(g, 4);
+    const offers = generateOffers(g, 3);
     g.flags._offers = offers.map((c) => c.id);
     const cur = p.club
       ? `현 소속   ${p.club.name} (${p.club.league} · ${DIV_LABEL[p.club.div]})\n감독 신뢰 ${round(g.npcs.coach.trust)}/100 · 계약 만료 ${p.contractUntil}년`
@@ -1972,7 +2039,7 @@ ev({
     // 구단의 답은 여기서 결정된다
     const accepted = !g.rng.chance(chance);
     g.flags._reqAccepted = accepted;
-    const offers = accepted ? generateOffers(g, 5) : [];
+    const offers = accepted ? generateOffers(g, 3) : [];
     g.flags._reqOffers = offers.map((c) => c.id);
     if (!accepted) {
       const alt = generateOffers(g, 1);
@@ -2132,12 +2199,26 @@ ev({
     const offers = (g.flags._offers || []).map(clubById).filter(Boolean);
     const loans = (g.flags._loans || []).map(clubById).filter(Boolean);
     const list = [...offerChoices(g, offers), ...offerChoices(g, loans, { loan: true })];
-    list.push({ t: '"남아서 붙어보자. 밀려서 나가는 건 더 싫어."', meta: '스트레스 + · 감독 신뢰 +', risk: 'MID', parent: 0, injury: 1, tags: ['pride'],
-      fx: (gg) => { gg.player.stress += 10; gg.npcs.coach.trust += 4; },
-      out: () => '훈련장에서 가장 먼저 나오고 가장 늦게 들어갔다.' });
-    list.push({ t: '"몸부터 만들자. 3월에 결과가 나오면 돼."', meta: '건강 ++ · 부상 위험 −', risk: 'SAFE', parent: 0, injury: 0, tags: ['discipline'],
-      fx: (gg) => { gg.player.fitness = clamp(gg.player.fitness + 12, 0, 100); gg.player.hidden.injuryProne -= 5; gg.player.form -= 4; },
-      out: () => '2월에 몸이 가벼웠다. 3월에 그게 결과로 나왔다.' });
+    list.push({ t: '"어디가 좀 안 좋은데, 참고 뛰자. 지금 빠지면 자리 없어져."',
+      meta: '부상 위험 ++ · 감독 신뢰 + · 컨디션 −', tags: ['pride', 'risk'],
+      fx: (gg) => {
+        gg.player.hidden.injuryProne = clamp(gg.player.hidden.injuryProne + 11, 3, 99);
+        gg.npcs.coach.trust += 9;
+        gg.player.fitness = clamp(gg.player.fitness - 12, 20, 100);
+        gg.player.stress += 10;
+        gg.flags.playingHurt = true;
+      },
+      out: () => '진통제를 맞고 나갔다. 감독은 그걸 알고, 알면서 계속 명단에 넣었다.\n무릎이 아픈 건 시즌 끝나고 생각하기로 했다.' });
+    list.push({ t: '"감독한테 로테이션 좀 돌려달라고 하자. 이대로는 시즌을 못 버텨."',
+      meta: '출전 감소 · 부상 위험 − · 감독 신뢰 −', tags: ['discipline'],
+      fx: (gg) => {
+        gg.npcs.coach.trust -= 11;
+        gg.player.hidden.injuryProne = clamp(gg.player.hidden.injuryProne - 8, 3, 99);
+        gg.player.fitness = clamp(gg.player.fitness + 15, 20, 100);
+        gg.player.form -= 5;
+        gg.flags.rotationAsked = true;
+      },
+      out: () => '면담을 신청했다. 감독은 알겠다고 했는데 표정이 안 좋았다.\n다음 세 경기에서 두 번 벤치였다. 몸은 확실히 나아졌다.' });
     return list;
   },
 });
@@ -2212,14 +2293,20 @@ ev({
 });
 
 ev({
-  id: 'manager_change', when: (g) => A(g) >= 17 && g.player.active && g.player.club, w: () => 45,
-  body: (g) => `${g.player.club.name} 감독이 경질됐다. 쌓아온 신뢰 ${round(g.npcs.coach.trust)}는 리셋이다.`,
+  id: 'manager_change', when: (g) => A(g) >= 17 && g.player.active && g.player.club, w: () => 18,
+  body: (g) => {
+    g.npcs.coach.unknown = true;   // 새 감독의 평가가 나오기 전까지 신뢰도는 미정이다
+    return `${g.player.club.name} 감독이 경질됐다.\n\n` +
+      `발표는 화요일 아침에 났다. 훈련장에 기자가 열 명 넘게 왔고, 우리는 실내에서 몸만 풀었다.\n` +
+      `그동안 쌓아온 신뢰 ${round(g.npcs.coach.trust)}는 이제 아무 의미가 없다.\n` +
+      `새 감독은 목요일에 온다. 그때까지 내 서열은 미정이다.`;
+  },
   choices: () => [
     { t: '"맞춰주자. 살아남는 게 먼저야."', meta: '적응력에 따라 신뢰 결정', risk: 'MID', parent: 0, injury: 0, tags: ['adaptability'],
-      fx: (gg) => { gg.npcs.coach.trust = clamp(50 + (gg.player.hidden.adaptability - 50) / 2 + gg.rng.norm(0, 8), 10, 95); gg.player.trait.adaptability += 8; },
+      fx: (gg) => { gg.npcs.coach.trust = clamp(50 + (gg.player.hidden.adaptability - 50) / 2 + gg.rng.norm(0, 8), 10, 95); gg.npcs.coach.unknown = false; gg.player.trait.adaptability += 8; },
       out: (gg) => gg.npcs.coach.trust > 60 ? '새 감독의 첫 명단에 이름이 있었다.' : '맞추려 했지만, 그가 원하는 선수는 내가 아니었다.' },
     { t: '"내 걸로 밀고 가자. 바꿔서 애매해지면 그게 끝이야."', meta: '성공 시 신뢰 +16 / 실패 시 −22', risk: 'HIGH', parent: 0, injury: 0, tags: ['pride', 'risk'],
-      fx: (gg) => { const ok = gg.rng.chance(0.42 + (gg.player.ovr - 68) / 60); gg.npcs.coach.trust = ok ? clamp(gg.npcs.coach.trust + 16, 10, 95) : clamp(gg.npcs.coach.trust - 22, 5, 95); },
+      fx: (gg) => { const ok = gg.rng.chance(0.42 + (gg.player.ovr - 68) / 60); gg.npcs.coach.trust = ok ? clamp(gg.npcs.coach.trust + 16, 10, 95) : clamp(gg.npcs.coach.trust - 22, 5, 95); gg.npcs.coach.unknown = false; },
       out: (gg) => gg.npcs.coach.trust > 55 ? '감독이 결국 나에게 맞춰 팀을 짰다.' : '벤치에서 후반기를 보냈다.' },
   ],
 });
@@ -2737,8 +2824,8 @@ function classify(g) {
   // 프로 6티어
   // T1은 발롱도르로 잠근다 — 난이도를 낮춰도 GOAT가 흔해지지 않게
   if (p.awards.ballonDor >= 1) return 'T1';
-  if (div === 1 && rep >= 80 && peakRep > 66 && apps > 260) return 'T2';   // 빅클럽 주축
-  if (div === 1 && apps > 330) return 'T3';                                  // 1부 정착
+  if (div === 1 && rep >= 84 && peakRep > 70 && apps > 320) return 'T2';   // 빅클럽 주축
+  if (div === 1 && apps > 230) return 'T3';                                  // 1부 정착
   if (div === 1 && apps > 40) return 'T4';                                   // 1부를 밟았으나 정착 실패
   if (apps > 200) return 'T5';
   return 'T6';
@@ -2812,6 +2899,7 @@ function careerTable(g) {
       if (s.finish) { prev.finish = s.finish; prev.size = s.size; }
       if (s.ucl) prev.ucl = s.ucl;
       if (s.ntCaps) { prev.ntCaps = s.ntCaps; prev.ntName = s.ntName; }
+      if (s.ntResult) prev.ntResult = s.ntResult;
       for (const a of s.ach) if (!prev.ach.includes(a)) prev.ach.push(a);
     } else {
       rows.set(key, {
@@ -2819,7 +2907,7 @@ function careerTable(g) {
         age: s.age, club: s.club, league: s.league, div: s.div,
         apps: s.apps, goals: s.goals, assists: s.assists, rating: s.rating,
         salary: s.salary, ach: [...s.ach], _n: 1,
-        finish: s.finish, size: s.size, ucl: s.ucl, ntCaps: s.ntCaps, ntName: s.ntName,
+        finish: s.finish, size: s.size, ucl: s.ucl, ntCaps: s.ntCaps, ntName: s.ntName, ntResult: s.ntResult,
       });
     }
   }
@@ -2830,7 +2918,9 @@ function careerTable(g) {
       salaryText: r.salary ? fmtWeekly(r.salary) : '-',
       finishText: r.finish ? `${r.finish}위/${r.size}` : '-',
       uclText: r.ucl || '-',
-      ntText: r.ntCaps ? `${r.ntName} ${r.ntCaps}캡` : '-',
+      ntText: r.ntResult
+        ? `${r.ntResult}${r.ntCaps ? ` · ${r.ntCaps}경기` : ''}`
+        : (r.ntCaps ? `${r.ntName} ${r.ntCaps}경기` : '-'),
     };
   });
 }
@@ -2874,7 +2964,7 @@ function dashboard(g) {
     awards: p.awards,
     sibling: g.npcs.sibling ? `${g.npcs.sibling.name} — ${{ STABLE: '안정', DRIFT: '이탈', SLUM: '슬럼', INCIDENT: '사건 이후', RECOVER: '회복', PRISON: '수감', DEAD: '사망' }[g.npcs.sibling.state]}` : '-',
     injuries: (p.career.injuries || []).slice(-3),
-    coach: round(g.npcs.coach.trust),
+    coach: g.npcs.coach.unknown ? '(미정)' : String(round(g.npcs.coach.trust)),
     contract: p.contractUntil ? `${p.contractUntil}년까지` : '-',
     career: { apps: p.career.apps, goals: p.career.goals, assists: p.career.assists, caps: p.career.caps, reputation: round(p.reputation) },
     table: careerTable(g),
@@ -3074,7 +3164,11 @@ function renderDash(g) {
     s1.appendChild(kv('팀 평균 능력', `${d.teamAvg} (내 능력 ${d.ability})`, d.ability >= d.teamAvg ? 'good' : 'warn'));
     s1.appendChild(kv('팀 내 위치', d.fit, d.fit === '즉시 주전' ? 'good' : d.fit === '전력 외' ? 'bad' : ''));
   }
-  if (d.club !== '무소속') s1.appendChild(kv('감독 신뢰', String(d.coach), d.coach > 65 ? 'good' : d.coach < 35 ? 'bad' : ''));
+  if (d.club !== '무소속') {
+    const cn = Number(d.coach);
+    s1.appendChild(kv('감독 신뢰', d.coach,
+      isNaN(cn) ? 'mute' : cn > 65 ? 'good' : cn < 35 ? 'bad' : ''));
+  }
   if (d.injuries.length) {
     s1.appendChild(kv('부상 이력', d.injuries.map((x) => `${x.name}(-${x.ovrLoss})`).join(', '), 'bad'));
   }

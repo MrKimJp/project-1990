@@ -131,7 +131,11 @@ function renderDash(g) {
     s1.appendChild(kv('팀 평균 능력', `${d.teamAvg} (내 능력 ${d.ability})`, d.ability >= d.teamAvg ? 'good' : 'warn'));
     s1.appendChild(kv('팀 내 위치', d.fit, d.fit === '즉시 주전' ? 'good' : d.fit === '전력 외' ? 'bad' : ''));
   }
-  if (d.club !== '무소속') s1.appendChild(kv('감독 신뢰', String(d.coach), d.coach > 65 ? 'good' : d.coach < 35 ? 'bad' : ''));
+  if (d.club !== '무소속') {
+    const cn = Number(d.coach);
+    s1.appendChild(kv('감독 신뢰', d.coach,
+      isNaN(cn) ? 'mute' : cn > 65 ? 'good' : cn < 35 ? 'bad' : ''));
+  }
   if (d.injuries.length) {
     s1.appendChild(kv('부상 이력', d.injuries.map((x) => `${x.name}(-${x.ovrLoss})`).join(', '), 'bad'));
   }
