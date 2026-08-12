@@ -758,7 +758,26 @@ function newGame(opts = {}) {
 /** 0~15세를 헤드리스로 진행한 뒤, 결과 상태를 산문 배경설정으로 렌더한다. */
 function runBackstory(g) {
   let guard = 0;
+  g.flags._inBackstory = true;
   while (!g.over && ageOf(g) < 16 && guard++ < 120) autoStep(g);
+
+  // 유년기 시뮬레이션에서 커리어가 끝나는 경우가 있다 (중도 포기 등).
+  // 게임은 반드시 만 16세에서 시작하므로, 그 사건은 배경 서사로만 남기고
+  // 16세 시점에 "무소속으로 다시 도전하는 상태"로 복원한다.
+  if (g.over || !g.player.active || ageOf(g) < 16) {
+    g.over = false; g.ending = null; g.pending = null;
+    g.player.active = true; g.player.retired = false;
+    g.flags.injuryEnded = false; g.flags.drifting = false; g.flags.lifeTrack = null;
+    g.flags.aqCount = 0;
+    if (hasMemory(g, 'quit') || hasMemory(g, 'washout')) {
+      g.flags.youthDropout = true;
+      g.player.club = null;
+      g.player.willToPlay = clamp(g.player.willToPlay + 22, 0, 100);
+    }
+    while (ageOf(g) < 16) { g.world.phase = 'SUMMER'; g.world.year += 1; }
+    g.world.phase = 'SUMMER';
+  }
+  g.flags._inBackstory = false;
   const prose = buildBackstory(g);
   g.backstory = prose;
   // 유년기 턴 로그를 지우고 배경설정으로 대체한다
@@ -819,6 +838,11 @@ function buildBackstory(g) {
   L.push(`학업은 ${p.academic >= 65 ? '상위권으로 유지했다' : p.academic >= 45 ? '중간 정도였다' : '거의 놓았다'}.`);
   L.push('');
 
+  if (g.flags.youthDropout) {
+    L.push(`한번은 완전히 그만뒀다. 축구화를 신발장 맨 아래로 밀어 넣고 몇 달을 보냈다.`);
+    L.push(`다시 시작한 이유는 스스로도 설명하지 못한다. 지금은 소속팀이 없다.`);
+    L.push('');
+  }
   L.push(`${g.world.year}년 여름. 만 16세. 후베닐 계약이 끝난다.`);
   L.push(`현재 능력 ${ability(g)} (${abilityLabel(ability(g))}) · 소속 ${yc}`);
   L.push(`이 도시에서 유소년 등록 선수가 프로 계약에 도달하는 비율은 1% 아래다. 여기서부터가 시작이다.`);
