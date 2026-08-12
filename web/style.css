@@ -79,7 +79,7 @@ input[type=text],input[type=number]{background:var(--navy2);border:1px solid var
 
 /* 커리어 테이블 */
 .tbl-wrap{overflow-x:auto;margin:0 -4px}
-table.career{border-collapse:collapse;width:100%;font-size:10.5px;min-width:430px}
+table.career{border-collapse:collapse;width:100%;font-size:10.5px;min-width:680px}
 table.career th{color:var(--tx3);font-weight:700;text-align:right;padding:4px 5px;border-bottom:1px solid var(--rule2);
   font-size:9px;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
 table.career th:nth-child(1),table.career th:nth-child(2),table.career th:nth-child(3){text-align:left}
@@ -88,6 +88,9 @@ table.career td:nth-child(1),table.career td:nth-child(2),table.career td:nth-ch
 table.career td.club{color:var(--tx);max-width:110px;overflow:hidden;text-overflow:ellipsis}
 table.career td.lg{color:var(--tx3);font-size:9.5px}
 table.career td.sal{color:var(--good)}
+table.career td.rank{color:var(--tx);font-weight:700}
+table.career td.cup{color:var(--sky);font-size:9.5px}
+table.career td.nt{color:var(--gold);font-size:9.5px}
 table.career td.ach{color:var(--gold);white-space:normal;min-width:96px;font-size:9.5px;text-align:left}
 table.career tr:hover td{background:var(--panel2)}
 .empty{color:var(--tx3);font-size:11px;padding:8px 0}
@@ -127,6 +130,17 @@ table.career tr:hover td{background:var(--panel2)}
 .blk.nt{color:var(--gold);font-size:13.5px}
 .blk.parent{color:var(--warn);font-size:12.5px;font-family:var(--mono)}
 .blk.growth{color:var(--good);font-style:italic;font-size:13.5px}
+
+/* ── 현재 이벤트 블록 (가시성 확보: 본문 2배 크기 + 카드) ── */
+.now{margin-top:14px;background:linear-gradient(180deg,#182742 0%,var(--panel2) 100%);
+  border:1px solid var(--rule2);border-left:4px solid var(--gold);border-radius:4px;padding:18px 22px}
+.now-tag{color:var(--gold);font-family:var(--mono);font-size:10px;letter-spacing:.2em;
+  text-transform:uppercase;margin-bottom:12px;padding-bottom:9px;border-bottom:1px solid var(--rule)}
+.now-body{font-size:17.5px;line-height:1.95;white-space:pre-wrap;color:#f2f6fc;max-width:64ch;
+  letter-spacing:-.005em}
+@media(max-width:700px){.now{padding:15px 16px}.now-body{font-size:16px;line-height:1.85}}
+.blk.log-end{color:var(--tx3);font-family:var(--mono);font-size:9.5px;letter-spacing:.24em;
+  text-align:center;border-top:1px solid var(--rule);padding-top:10px;margin-top:4px}
 
 /* ── 선택지 + 배지 ── */
 .choices{margin-top:15px;border-top:2px solid var(--rule2);padding-top:15px}

@@ -80,7 +80,7 @@ input[type=text],input[type=number]{background:var(--navy2);border:1px solid var
 
 /* 커리어 테이블 */
 .tbl-wrap{overflow-x:auto;margin:0 -4px}
-table.career{border-collapse:collapse;width:100%;font-size:10.5px;min-width:430px}
+table.career{border-collapse:collapse;width:100%;font-size:10.5px;min-width:680px}
 table.career th{color:var(--tx3);font-weight:700;text-align:right;padding:4px 5px;border-bottom:1px solid var(--rule2);
   font-size:9px;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
 table.career th:nth-child(1),table.career th:nth-child(2),table.career th:nth-child(3){text-align:left}
@@ -89,6 +89,9 @@ table.career td:nth-child(1),table.career td:nth-child(2),table.career td:nth-ch
 table.career td.club{color:var(--tx);max-width:110px;overflow:hidden;text-overflow:ellipsis}
 table.career td.lg{color:var(--tx3);font-size:9.5px}
 table.career td.sal{color:var(--good)}
+table.career td.rank{color:var(--tx);font-weight:700}
+table.career td.cup{color:var(--sky);font-size:9.5px}
+table.career td.nt{color:var(--gold);font-size:9.5px}
 table.career td.ach{color:var(--gold);white-space:normal;min-width:96px;font-size:9.5px;text-align:left}
 table.career tr:hover td{background:var(--panel2)}
 .empty{color:var(--tx3);font-size:11px;padding:8px 0}
@@ -128,6 +131,17 @@ table.career tr:hover td{background:var(--panel2)}
 .blk.nt{color:var(--gold);font-size:13.5px}
 .blk.parent{color:var(--warn);font-size:12.5px;font-family:var(--mono)}
 .blk.growth{color:var(--good);font-style:italic;font-size:13.5px}
+
+/* ── 현재 이벤트 블록 (가시성 확보: 본문 2배 크기 + 카드) ── */
+.now{margin-top:14px;background:linear-gradient(180deg,#182742 0%,var(--panel2) 100%);
+  border:1px solid var(--rule2);border-left:4px solid var(--gold);border-radius:4px;padding:18px 22px}
+.now-tag{color:var(--gold);font-family:var(--mono);font-size:10px;letter-spacing:.2em;
+  text-transform:uppercase;margin-bottom:12px;padding-bottom:9px;border-bottom:1px solid var(--rule)}
+.now-body{font-size:17.5px;line-height:1.95;white-space:pre-wrap;color:#f2f6fc;max-width:64ch;
+  letter-spacing:-.005em}
+@media(max-width:700px){.now{padding:15px 16px}.now-body{font-size:16px;line-height:1.85}}
+.blk.log-end{color:var(--tx3);font-family:var(--mono);font-size:9.5px;letter-spacing:.24em;
+  text-align:center;border-top:1px solid var(--rule);padding-top:10px;margin-top:4px}
 
 /* ── 선택지 + 배지 ── */
 .choices{margin-top:15px;border-top:2px solid var(--rule2);padding-top:15px}
@@ -578,6 +592,10 @@ const CLUB_COUNT = CLUBS.length;
 const clubById = (id) => CLUBS.find((c) => c.id === id);
 const leagueOf = (id) => LEAGUES.find((l) => l.id === id);
 const DIV_LABEL = { 1: '1부', 2: '2부', 3: '3부' };
+
+/** 주급 표기 */
+const weekly = (annual) => Math.round(annual / 52);
+const fmtWeekly = (annual) => fmtMoney(weekly(annual)) + '/주';
 
 function salaryFor(club, ovr, year, rep) {
   const base = { 1: 850000, 2: 170000, 3: 32000 }[club.div] ?? 32000;
@@ -1156,9 +1174,11 @@ function simulatePeriod(g) {
 
   // 팀 성적 + 업적
   const ach = [];
+  let finishRec = null, uclRec = null;
   const doFinish = g.world.phase === 'SUMMER' || cadenceOf(age) === 'YEAR';
   if (seniorClub && doFinish && apps >= 5) {
     const { finish, size } = leagueFinish(g, club);
+    finishRec = { finish, size };
     if (finish === 1) {
       ach.push(club.div === 1 ? `${club.league} 우승` : `${club.league} 우승 · 승격`);
       p.career.trophies.push(`${g.world.year} ${club.league} 우승`);
@@ -1180,6 +1200,7 @@ function simulatePeriod(g) {
   // 유럽대항전 + 개인 수상
   if (seniorClub && doFinish) {
     const ucl = simulateEurope(g, club, apps, total, rating);
+    uclRec = ucl;
     if (ucl) {
       ach.push(`UCL ${ucl.label}`);
       pushLog(g, 'ucl', `챔피언스리그 ${ucl.label}. 평판 +${ucl.gain}.`);
@@ -1195,10 +1216,15 @@ function simulatePeriod(g) {
     year: g.world.year, phase: g.world.phase, age,
     club: club.name, league: club.league, div: club.div,
     apps, goals, assists, rating: +rating.toFixed(2), salary, ach, senior: seniorClub,
+    finish: finishRec ? finishRec.finish : null,
+    size: finishRec ? finishRec.size : null,
+    ucl: uclRec ? uclRec.label : null,
+    ntCaps: 0,                                   // nationalTeamCheck 에서 이 기간 출전분만 채운다
+    ntName: p.ntTeam ? NT_NAME[p.ntTeam] : null,
   });
 
   let line = `${club.name} (${club.league}) — ${apps}경기 ${goals}골 ${assists}도움 · 평점 ${rating.toFixed(2)}`;
-  if (salary) line += ` · 연봉 ${fmtMoney(salary)}`;
+  if (salary) line += ` · 주급 ${fmtWeekly(salary)}`;
   if (apps === 0) line += '\n출전 기회를 전혀 얻지 못했다.';
   else if (share > 0.8) line += '\n확실한 주전이었다.';
   if (ach.length) line += `\n▸ ${ach.join(' · ')}`;
@@ -1270,7 +1296,7 @@ function ballonDorCheck(g, club, ucl, rating, goals, apps) {
   const p = g.player;
   if (!club || club.div !== 1) return null;
   const rep = clubRepAt(club, g.world.year);
-  if (rep < 82 || p.reputation < 78) return null;
+  if (rep < 84 || p.reputation < 82) return null;
 
   let score = (p.reputation - 78) * 2.4 + (rep - 82) * 0.8 + (rating - 7.0) * 16 + goals * 0.5;
   if (ucl) score += [0, 4, 9, 16, 22, 34][ucl.reach];
@@ -1278,7 +1304,7 @@ function ballonDorCheck(g, club, ucl, rating, goals, apps) {
   if (g.flags.wcHero) score += 12;
   score += g.rng.norm(0, 9);
 
-  if (score > 49) {
+  if (score > 62) {
     p.awards.ballonDor += 1;
     p.career.trophies.push(`${g.world.year} 발롱도르 수상`);
     remember(g, 'ballon', `${g.world.year}년 발롱도르를 받았다.`, 1.0);
@@ -1290,15 +1316,51 @@ function ballonDorCheck(g, club, ucl, rating, goals, apps) {
 
 /* ─────────────────────────── 10. 국가대표 ─────────────────────────── */
 
+/**
+ * 대표팀이 볼 수 있는 무대인가.
+ * 3부(프리메라 RFEF급) 선수는 어느 대표팀도 뽑지 않는다. 스카우팅 자체가 닿지 않는다.
+ * 강팀(스페인·아르헨티나)은 1부 주전만, 중·약체는 2부까지 본다.
+ */
+function ntEligible(g) {
+  const p = g.player;
+  if (!p.club || p.club.youth) return false;
+  const bar = NT_BAR[p.ntTeam || 'ESP'] ?? 70;
+  const maxDiv = bar >= 80 ? 1 : 2;
+  if (p.club.div > maxDiv) return false;
+  // 1부만 보는 강팀은 클럽 수준도 본다 (강등권 클럽의 백업은 뽑지 않는다)
+  if (bar >= 80 && clubRepAt(p.club, g.world.year) < 62) return false;
+  return true;
+}
+
+/** 이 기간에 실제로 소화한 A매치를 직전 시즌 기록에 적는다 */
+function recordCaps(g, caps, nt) {
+  const arr = g.player.career.seasons;
+  const last = arr[arr.length - 1];
+  if (!last || last.year !== g.world.year || last.phase !== g.world.phase) return;
+  last.ntCaps = (last.ntCaps || 0) + caps;
+  last.ntName = NT_NAME[nt];
+}
+
 function nationalTeamCheck(g) {
   const p = g.player;
   const age = ageOf(g);
   if (!p.active || age < 18) return;
   const nt = p.ntTeam || 'ESP';
   const bar = NT_BAR[nt] ?? 70;
+
+  // 소속 리그 수준이 대표팀 선발권 밖이면 이 기간에는 차출되지 않는다
+  if (!ntEligible(g)) {
+    if (p.ntTeam && p.club && !p.club.youth && p.club.div >= 3 && !g.flags._ntDropped) {
+      g.flags._ntDropped = true;
+      pushLog(g, 'nt', `${NT_NAME[p.ntTeam]} 대표팀 명단에서 빠졌다. ${DIV_LABEL[p.club.div]} 소속 선수를 부르는 감독은 없다.`);
+    }
+    return;
+  }
+  g.flags._ntDropped = false;
+
   if (!p.ntTeam) {
     if (p.ovr + p.reputation * 0.25 > bar - 4 && g.rng.chance(0.55)) {
-      p.ntTeam = nt; p.career.caps += 1;
+      p.ntTeam = nt; p.career.caps += 1; recordCaps(g, 1, nt);
       pushLog(g, 'nt', `${NT_NAME[nt]} 대표팀 A매치 데뷔.`);
       remember(g, 'nt_debut', `${g.world.year}년 ${NT_NAME[nt]} 대표팀 데뷔`, 0.75);
       p.career.trophies.push(`${g.world.year} ${NT_NAME[nt]} 대표팀 데뷔`);
@@ -1311,10 +1373,30 @@ function nationalTeamCheck(g) {
     const caps = round(periodYears(g) * g.rng.int(3, 9));
     p.career.caps += caps;
     p.career.ntGoals += round(caps * POSITIONS[p.position].goal * 0.6 * g.rng.f() * 1.6);
+    recordCaps(g, caps, p.ntTeam);
   }
 }
 
 /* ─────────────────────────── 11. 이적 / 오퍼 ─────────────────────────── */
+
+/** 빅클럽 기준 = 2015년 토트넘의 팀 평균 (= 80) */
+const BIG_CLUB_AVG = 80;
+const isBigClub = (g, club) => teamAvgAt(club, g.world.year) >= BIG_CLUB_AVG;
+
+/**
+ * 그 해 이적시장의 기후. 역사 이벤트가 시장 자체를 바꾼다.
+ *   domestic — 자국(스페인) 경제위기: 구단 자금난 → 매각 의지, 해외 오퍼 증가
+ *   global   — 세계 경제위기: 주급 동결 + 이적시장 동결 (빅클럽은 예외)
+ */
+function marketClimate(g) {
+  const y = g.world.year;
+  const domestic = (y >= 2008 && y <= 2014) || (y >= 2020 && y <= 2021);
+  const global = (y >= 2008 && y <= 2010) || (y >= 2020 && y <= 2021);
+  const notes = [];
+  if (domestic) notes.push('스페인 구단들이 자금난에 빠졌다. 팔 수 있는 선수는 팔려 나간다.');
+  if (global) notes.push('세계적으로 이적시장이 얼어붙었다. 주급 인상은 사실상 동결이다. 돈이 있는 빅클럽만 예외다.');
+  return { domestic, global, notes };
+}
 
 function scoutedValue(g, club) {
   const p = g.player;
@@ -1337,6 +1419,11 @@ function fitLabel(g, club) {
 function generateOffers(g, count = 6) {
   const p = g.player;
   const age = ageOf(g);
+  const clim = marketClimate(g);
+  const myAvg = p.club && !p.club.youth ? teamAvgAt(p.club, g.world.year) : null;
+  // 직전 시즌 출전 지분 — 방출 대상이면 동급 이적 예외를 허용한다
+  const last = p.career.seasons[p.career.seasons.length - 1];
+  const benched = last ? last.apps < Math.max(4, 18 * 0.3) : false;
   const pool = CLUBS.filter((c) => {
     if (p.club && c.id === p.club.id) return false;
     if (c.youth || !clubExists(c, g.world.year)) return false;
@@ -1347,6 +1434,13 @@ function generateOffers(g, count = 6) {
     // 성인 프로 계약의 절대 하한
     if (age >= 16 && p.ovr < 52) return false;
     if (p.ovr > avg + 16 && c.div >= 3) return false;
+
+    // ── 문제 2: 팀 평균이 ±5 이내로 비슷한 구단으로는 이적하지 않는다 (매각 메리트 없음)
+    //    예외: 직전 시즌 출전이 30% 미만이면 "안 뛰니 보낸다" 로직으로 동급 이적 허용
+    if (myAvg != null && Math.abs(avg - myAvg) <= 5 && !benched) return false;
+
+    // ── 문제 1: 세계 경제위기에는 이적시장이 동결된다. 빅클럽만 예외.
+    if (clim.global && !isBigClub(g, c) && g.rng.chance(0.72)) return false;
     if (c.nat !== 'ESP') {
       if (age < 18 && g.world.year >= 2001) return false; // FIFA 18세 미만 국제이적 제한
       if (p.reputation < 26 && age < 22) return false;
@@ -1356,8 +1450,10 @@ function generateOffers(g, count = 6) {
   });
   if (!pool.length) return [];
   const scored = pool.map((c) => ({
+    // 자국 경제위기에는 스페인 구단이 팔고, 해외 오퍼의 비중이 올라간다
     w: (1 / (1 + Math.abs(scoutedValue(g, c) - teamAvgAt(c, g.world.year)) / 6)) *
-       (clubRepAt(c, g.world.year) > 84 ? 0.6 : 1) * (c.nat === 'ESP' ? 1.6 : 1),
+       (clubRepAt(c, g.world.year) > 84 ? 0.6 : 1) *
+       (c.nat === 'ESP' ? (clim.domestic ? 0.75 : 1.6) : (clim.domestic ? 1.9 : 1)),
     c,
   }));
   const out = [];
@@ -1407,11 +1503,34 @@ function loanTargets(g, count = 2) {
   return out;
 }
 
+/**
+ * 구단이 이적을 거부할 확률. 기본 35%에서 상황에 따라 10~70%로 움직인다.
+ * 핵심 전력일수록 안 놔주고, 안 뛰거나 계약이 얼마 안 남았으면 놔준다.
+ */
+function refusalChance(g, target) {
+  const p = g.player;
+  if (!p.club || p.club.youth || p.loanFrom) return 0;
+  const myAvg = teamAvgAt(p.club, g.world.year);
+  let x = 0.35;
+  x += (g.npcs.coach.trust - 50) / 220;              // 감독 신뢰가 높으면 안 놔준다
+  x += clamp(p.ovr - myAvg, -10, 15) / 60;           // 팀 대비 상위 전력이면 안 놔준다
+  if (((p.contractUntil || 0) - g.world.year) <= 1) x -= 0.18;  // 계약 만료 임박
+  const last = p.career.seasons[p.career.seasons.length - 1];
+  if (last && last.apps < 6) x -= 0.15;              // 안 뛰는 선수는 붙잡지 않는다
+  if (marketClimate(g).domestic) x -= 0.12;          // 자금난이면 오히려 팔고 싶다
+  if (g.flags.wantsOut) x -= 0.10;
+  if (target && isBigClub(g, target)) x -= 0.05;     // 빅클럽 오퍼는 거절하기 어렵다
+  return clamp(x, 0.10, 0.70);
+}
+
 function joinClub(g, club, opts = {}) {
   const p = g.player;
   p.club = { ...club };
   p.loanFrom = opts.loanFrom || null;
-  p.contractUntil = g.world.year + (opts.years ?? (ageOf(g) < 20 ? 3 : 4));
+  p.loanUntil = opts.loanFrom ? g.world.year + 1 : null;   // 임대는 1년 뒤 여름에 복귀
+  p.contractUntil = opts.loanFrom
+    ? p.contractUntil
+    : g.world.year + (opts.years ?? (ageOf(g) < 20 ? 3 : 4));
   g.npcs.coach = { trust: clamp(48 + g.rng.norm(0, 9) + (opts.wanted ? 10 : 0), 10, 90) };
   p.stress = clamp(p.stress + clamp((club.comp - 65) / 6 - (p.hidden.adaptability - 50) / 8, -6, 14), 0, 100);
   p.path.push(`${g.world.year} ${club.name}${opts.loanFrom ? ' (임대)' : ''}`);
@@ -1431,15 +1550,24 @@ function offerChoices(g, offers, { loan = false } = {}) {
     const fit = fitLabel(g, c);
     return {
       t: `${c.name} — ${c.league} (${DIV_LABEL[c.div]})${loan ? ' [임대]' : ''}`,
-      meta: `팀 평균 능력 ${fit.avg} · 내 능력 ${ability(g)} → ${fit.label} · 예상 연봉 ${fmtMoney(salaryFor(c, g.player.ovr, g.world.year, g.player.reputation))}`,
+      meta: `팀 평균 ${fit.avg} · 내 능력 ${ability(g)} → ${fit.label} · 예상 주급 ${fmtWeekly(salaryFor(c, g.player.ovr, g.world.year, g.player.reputation))}`,
       fit,
       tags: up ? ['ambition', 'risk'] : ['safe'],
       fx: (gg) => {
         const from = gg.player.club;
+        // 구단이 거부할 수 있다
+        if (!loan && gg.rng.chance(refusalChance(gg, c))) {
+          gg.flags.transferBlocked = { name: c.name, id: c.id };
+          gg.player.stress += 12;
+          return;
+        }
+        gg.flags.transferBlocked = null;
         joinClub(gg, c, { years: loan ? 1 : 4, wanted: !up, loanFrom: loan ? from : null });
         if (!loan) gg.player.reputation += up ? 4 : 1;
       },
-      out: () => up
+      out: (gg) => gg.flags.transferBlocked
+        ? `구단이 이적을 거부했다.\n\n단장은 "지금은 팀 계획의 일부"라는 말만 반복했다. ${c.name} 측은 제안을 철회하지 않았지만,\n이적료 협상 테이블 자체가 열리지 않았다. 나는 여기 남는다. 원하지 않는 방식으로.`
+        : up
         ? `${c.name}. 여기서는 아무것도 보장되지 않는다. 그게 온 이유다.`
         : `${c.name}. 매주 90분을 뛸 수 있다면 리그 이름은 숫자일 뿐이다.`,
     };
@@ -1637,35 +1765,52 @@ ev({
       `아버지는 그 얘기를 한 달 뒤에 했다. 그동안 매일 아침 같은 시간에 집을 나갔다고 했다.\n` +
       `어머니 ${m.name}은 ${m.job} 일을 야간까지 늘렸다.\n\n` +
       `집 대출이 남아 있다. 월 €${mortgage}.\n\n` +
-      `나는 지금 ${g.player.club ? g.player.club.name : '무소속'}에서 연봉 ${fmtMoney(g.player.econ.wageYear)}을 받는다.\n` +
+      `나는 지금 ${g.player.club ? g.player.club.name : '무소속'}에서 주급 ${fmtWeekly(g.player.econ.wageYear)}을 받는다.\n` +
       `세후로 나누면 이 집 생활비의 절반쯤 된다. 만 ${A(g)}세에 처음으로, 내 계약이 가족의 재무 계획에 들어갔다.\n\n` +
       `식탁에서 아무도 그 얘기를 먼저 꺼내지 않는다. 그게 이 집의 방식이다.\n` +
       `나는 훈련이 끝나고 차 안에서 계산기를 두 번 두드렸다.`;
     },
-  choices: (g) => [
-    { t: '내 연봉으로 집 대출을 넘겨받는다.',
-      meta: `부채 ${fmtMoney(g.flags._mortgage * 12 * 8)} 이전 (은행 이자 9%) · 자산 축적 대폭 감소 · 가족 관계 최상`,
+  choices: (g) => {
+    const total = g.flags._mortgage * 12 * 8;
+    const rich = g.player.econ.assets >= total * 1.15;   // 문제 6: 돈이 있으면 대출을 끼지 않는다
+    const list = [];
+    if (rich) list.push({
+      t: '남은 대출을 일시불로 갚아버린다.',
+      meta: `자산 ${fmtMoney(total)} 지출 · 부채 없음 · 가족 관계 최상`,
       tags: ['family'],
       fx: (gg) => {
-        gg.econDebtNote = true;
-        gg.player.econ.debt += gg.flags._mortgage * 12 * 8;
+        gg.player.econ.assets -= total;
+        gg.npcs.father.trust = 98; gg.npcs.father.status = '실직'; gg.npcs.father.statusYear = gg.world.year;
+        gg.player.stress -= 4;
+        remember(gg, 'paid_off_home', `${gg.world.year}년, 부모님 집 대출을 한 번에 갚았다.`, 0.9);
+      },
+      out: () => '은행에 가서 한 번에 정리했다. 통장 숫자가 확 줄었지만, 이자라는 단어를 다시 볼 일이 없어졌다.\n어머니가 서류를 액자에 넣어뒀다.',
+    });
+    if (!rich) list.push({
+      t: '내 주급으로 집 대출을 넘겨받는다.',
+      meta: `부채 ${fmtMoney(total)} 이전 (은행 이자 9%) · 자산 축적 대폭 감소 · 가족 관계 최상`,
+      tags: ['family'],
+      fx: (gg) => {
+        gg.player.econ.debt += total;
         gg.player.econ.debtRate = 0.09;
         gg.npcs.father.trust = 98; gg.player.stress += 10;
+        gg.npcs.father.status = '실직'; gg.npcs.father.statusYear = gg.world.year;
         shiftReaction(gg, 1, '가족의 대출을 넘겨받음');
         remember(gg, 'took_mortgage', `${gg.world.year}년, 아버지의 집 대출을 내 이름으로 넘겼다.`, 0.9);
       },
-      out: () => '서류에 서명하는 데 20분이 걸렸다. 아버지는 그 자리에 오지 않았다.\n집을 지켰다. 대신 앞으로 몇 년간 내 통장은 내 것이 아니다.' },
-    { t: '돈이 되는 이적을 우선한다.',
+      out: () => '서류에 서명하는 데 20분이 걸렸다. 아버지는 그 자리에 오지 않았다.\n집을 지켰다. 대신 앞으로 몇 년간 내 통장은 내 것이 아니다.' });
+    list.push({ t: '돈이 되는 이적을 우선한다.',
       meta: '다음 이적시장에서 연봉 높은 오퍼를 우선 수락 · 축구적 성장 리스크',
       tags: ['ambition'],
-      fx: (gg) => { gg.flags.chaseMoney = true; gg.player.stress += 6; remember(gg, 'chase_money', `${gg.world.year}년, 가계 때문에 돈을 따라가기로 했다.`, 0.75); },
-      out: () => '에이전트에게 전화했다. "연봉 제일 높은 데로 보내주세요."\n그 통화 이후, 내 커리어의 기준이 하나 바뀌었다.' },
-    { t: '매달 생활비를 보내되 커리어는 그대로 간다.',
+      fx: (gg) => { gg.npcs.father.status = '실직'; gg.npcs.father.statusYear = gg.world.year; gg.flags.chaseMoney = true; gg.player.stress += 6; remember(gg, 'chase_money', `${gg.world.year}년, 가계 때문에 돈을 따라가기로 했다.`, 0.75); },
+      out: () => '에이전트에게 전화했다. "주급 제일 높은 데로 보내주세요."\n그 통화 이후, 내 커리어의 기준이 하나 바뀌었다.' });
+    list.push({ t: '매달 생활비를 보내되 커리어는 그대로 간다.',
       meta: `자산 축적 −30% · 스트레스 + · 부채는 생기지 않는다`,
       tags: ['safe'],
-      fx: (gg) => { gg.flags.sendsMoney = true; gg.player.stress += 8; gg.player.econ.household = clamp(gg.player.econ.household + 8, 0, 100); },
-      out: () => '매달 정해진 날에 송금한다. 아버지는 한 번도 고맙다고 하지 않았고, 나는 그걸 이해했다.' },
-  ],
+      fx: (gg) => { gg.npcs.father.status = '실직'; gg.npcs.father.statusYear = gg.world.year; gg.flags.sendsMoney = true; gg.player.stress += 8; gg.player.econ.household = clamp(gg.player.econ.household + 8, 0, 100); },
+      out: () => '매달 정해진 날에 송금한다. 아버지는 한 번도 고맙다고 하지 않았고, 나는 그걸 이해했다.' });
+    return list;
+  },
 });
 
 ev({
@@ -1687,7 +1832,17 @@ ev({
       `어머니는 울지 않았다. 그게 더 견디기 어려웠다.\n` +
       `전화를 끊고 훈련장에 나갔다. 그날 슈팅이 하나도 안 들어갔다.`;
   },
-  choices: (g) => [
+  choices: (g) => (g.player.econ.assets >= g.flags._bail * 1.2 ? [
+    { t: '통장에서 바로 전액 낸다.',
+      meta: `자산 ${fmtMoney(g.flags._bail)} 지출 · 부채 없음 · 형 관계 회복`,
+      tags: ['family'],
+      fx: (gg) => {
+        gg.player.econ.assets -= gg.flags._bail;
+        gg.npcs.sibling.helped += 1; gg.npcs.sibling.risk -= 18; gg.player.stress += 8;
+        remember(gg, 'bail_paid_cash', `${gg.world.year}년, 형의 보석금을 내 돈으로 냈다.`, 0.85);
+      },
+      out: () => '계좌 이체 한 번으로 끝났다. 스무 살의 나에게는 불가능했던 일이다.\n형은 사흘 뒤에 나왔고, 아무 말도 하지 않고 내 어깨를 한 번 쳤다.' },
+  ] : [
     { t: '사채를 써서 보석금을 전액 낸다.',
       meta: `부채 ${fmtMoney(g.flags._bail)} (연이자 34%) · 스트레스 ++ · 형 관계 회복`,
       tags: ['family', 'risk'],
@@ -1717,7 +1872,7 @@ ev({
         remember(gg, 'bail_refused', `${gg.world.year}년, 형의 보석금을 내지 않았다.`, 0.95);
       },
       out: () => '전화를 끊고 다시 걸지 않았다.\n그해 여름 어머니 집에 가지 않았다. 이 결정은 십 년 뒤에 다시 돌아온다.' },
-  ],
+  ]),
 });
 
 ev({
@@ -1772,6 +1927,67 @@ ev({
     }
     return list;
   },
+});
+
+ev({
+  id: 'holdout', when: (g) => !!g.flags.transferBlocked && g.player.active, w: () => 9999,
+  body: (g) => {
+    const t = g.flags.transferBlocked;
+    return `${t.name}으로의 이적이 구단에서 막혔다.\n\n` +
+      `프리시즌 첫 훈련에 나갔다. 감독은 아무 일도 없었던 것처럼 인사했고,\n` +
+      `나는 아무 일도 없었던 것처럼 인사를 받았다. 라커룸의 몇 명은 이미 알고 있었다.\n\n` +
+      `에이전트는 두 가지 길을 말했다. 하나는 이 시즌을 그냥 뛰는 것.\n` +
+      `다른 하나는 훈련 강도를 의도적으로 떨어뜨려서, 구단이 나를 파는 게 이득이라고 판단하게 만드는 것.\n\n` +
+      `후자는 도박이다. 성공하면 겨울에 나갈 수 있다.\n` +
+      `실패하면 징계 명단에 올라가고, 그 시즌은 통째로 사라진다. 만 ${A(g)}세에 한 시즌은 짧지 않다.\n\n` +
+      `창밖으로 훈련장이 보인다. 아직 아무도 나오지 않았다.`;
+  },
+  choices: (g) => [
+    { t: '태업한다. 구단이 나를 팔게 만든다.',
+      meta: '결과 3분기: 징계(출전 급감) / 이적 허가 / 상승 조건 재계약',
+      tags: ['risk', 'pride'],
+      fx: (gg) => {
+        const t = gg.flags.transferBlocked;
+        gg.flags.transferBlocked = null;
+        // 지분: 태업의 결과는 세 갈래다
+        const lev = gg.player.reputation + (gg.player.ovr - teamAvgAt(gg.player.club, gg.world.year)) * 2;
+        const r = gg.rng.f();
+        if (r < 0.34) {
+          gg.flags.holdoutResult = 'DISCIPLINE';
+          gg.npcs.coach.trust = clamp(gg.npcs.coach.trust - 34, 5, 95);
+          gg.player.form = clamp(gg.player.form - 22, 10, 98);
+          gg.player.reputation = clamp(gg.player.reputation - 8, 0, 100);
+          gg.player.stress += 20;
+          remember(gg, 'holdout_punished', `${gg.world.year}년, 태업으로 징계를 받아 한 시즌을 잃었다.`, 0.88);
+        } else if (r < 0.34 + clamp(0.30 + lev / 400, 0.2, 0.5)) {
+          gg.flags.holdoutResult = 'RELEASED';
+          const target = CLUBS.find((c) => c.id === t.id);
+          if (target) joinClub(gg, target, { years: 4, wanted: true });
+          remember(gg, 'holdout_won', `${gg.world.year}년, 태업 끝에 ${t.name} 이적을 받아냈다.`, 0.85);
+        } else {
+          gg.flags.holdoutResult = 'RENEW';
+          gg.player.contractUntil = gg.world.year + 4;
+          gg.flags.wageBump = 1.9;
+          gg.npcs.coach.trust = clamp(gg.npcs.coach.trust - 8, 5, 95);
+          remember(gg, 'holdout_renew', `${gg.world.year}년, 태업 끝에 조건을 올려 재계약했다.`, 0.8);
+        }
+      },
+      out: (gg) => ({
+        DISCIPLINE: '2주째 훈련에서 감독이 나를 불러 세웠다. 그날로 1군 명단에서 빠졌다.\n예비 명단에서 시즌을 보냈다. 이 도박은 실패했다.',
+        RELEASED: '한 달 만에 구단이 손을 들었다. "팀 분위기를 해치는 선수는 데리고 있지 않는다."\n원하는 곳으로 갔다. 대신 이 도시에서의 평판은 남았다.',
+        RENEW: '구단이 다른 카드를 냈다. 주급을 두 배 가까이 올린 재계약서였다.\n서명했다. 이적은 못 했지만, 이겼다고 볼 수도 있다.',
+      }[gg.flags.holdoutResult] || '') },
+    { t: '받아들이고 이 시즌을 정면으로 뛴다.',
+      meta: '감독 신뢰 + · 스트레스 − · 다음 여름 이적 거부율 하락',
+      tags: ['loyalty', 'discipline'],
+      fx: (gg) => {
+        gg.flags.transferBlocked = null;
+        gg.npcs.coach.trust = clamp(gg.npcs.coach.trust + 14, 5, 95);
+        gg.player.stress = clamp(gg.player.stress - 8, 0, 100);
+        gg.flags.wantsOut = true;   // 다음 여름 협상에서 유리해진다
+      },
+      out: () => '프로답게 뛰었다. 단장이 시즌 끝에 "다음 여름에는 막지 않겠다"고 했다.\n그 말을 믿을지는 다음 여름에 알게 된다.' },
+  ],
 });
 
 ev({
@@ -1848,8 +2064,15 @@ ev({
   body: (g) => `${g.player.club.name}과의 계약이 ${g.player.contractUntil}년에 끝난다.\n현재 연봉 ${fmtMoney(g.player.econ.wageYear)} · 감독 신뢰 ${round(g.npcs.coach.trust)}/100`,
   choices: () => [
     { t: '재계약한다. 안정을 택한다.', meta: '연봉 ×1.45 · 4년 연장', risk: 'SAFE', parent: 1, injury: 0, tags: ['safe', 'loyalty'],
-      fx: (gg) => { gg.player.contractUntil = gg.world.year + 4; gg.player.stress -= 8; gg.npcs.coach.trust += 6; gg.flags.wageBump = 1.45; },
-      out: () => '4년 연장. 연봉이 올랐다.' },
+      fx: (gg) => {
+        gg.player.contractUntil = gg.world.year + 4; gg.player.stress -= 8; gg.npcs.coach.trust += 6;
+        const frozen = marketClimate(gg).global && !isBigClub(gg, gg.player.club);
+        gg.flags.wageBump = frozen ? 1.0 : 1.45;
+        gg.flags.wageFrozen = frozen;
+      },
+      out: (gg) => gg.flags.wageFrozen
+        ? '4년 연장. 다만 주급은 동결이다. 구단은 "지금 시장에서는 이게 최선"이라고 했고, 그건 사실이었다.'
+        : '4년 연장. 주급이 올랐다.' },
     { t: '주급 인상을 강하게 요구한다.', meta: '성공 시 연봉 ×2.0 / 실패 시 신뢰 −16', risk: 'HIGH', parent: 0, injury: 0, tags: ['pride', 'risk'],
       fx: (gg) => {
         if (gg.player.reputation + gg.npcs.coach.trust / 2 > 92) { gg.player.contractUntil = gg.world.year + 4; gg.flags.wageBump = 2.0; }
@@ -1922,7 +2145,10 @@ ev({
 });
 
 ev({
-  id: 'nt_choice', once: true, when: (g) => g.player.secondNationality && A(g) >= 19 && A(g) <= 27 && !g.player.ntTeam && !g.player.ntLocked && g.player.reputation > 26, w: () => 250,
+  id: 'nt_choice', once: true,
+  when: (g) => g.player.secondNationality && A(g) >= 19 && A(g) <= 27 && !g.player.ntTeam &&
+    !g.player.ntLocked && g.player.reputation > 26 && g.player.club && !g.player.club.youth && g.player.club.div <= 2,
+  w: () => 250,
   body: (g) => {
     const s = g.player.secondNationality;
     return `이중국적자다. 두 협회가 모두 연락을 해왔다.\n\n` +
@@ -1944,12 +2170,18 @@ ev({
 });
 
 ev({
-  id: 'world_cup', when: (g) => WORLD_CUP_YEARS.includes(g.world.year) && g.world.phase === 'SUMMER' && A(g) >= 20 && A(g) <= 36 && g.player.active && g.player.ntTeam, w: () => 800,
+  id: 'world_cup',
+  when: (g) => WORLD_CUP_YEARS.includes(g.world.year) && g.world.phase === 'SUMMER' &&
+    A(g) >= 20 && A(g) <= 36 && g.player.active && g.player.ntTeam && ntEligible(g),
+  w: () => 800,
   body: (g) => {
     g.flags._wcIn = g.player.ovr + g.player.reputation * 0.3 + g.rng.norm(0, 5) > (NT_BAR[g.player.ntTeam] ?? 70) + 2;
+    const club = g.player.club;
     return g.flags._wcIn
-      ? `${g.world.year} 월드컵 ${NT_NAME[g.player.ntTeam]} 최종 명단이 발표됐다. 이름이 있다.`
-      : `${g.world.year} 월드컵 최종 명단이 발표됐다. 이름이 없다.`;
+      ? `${g.world.year} 월드컵 ${NT_NAME[g.player.ntTeam]} 최종 명단이 발표됐다. 이름이 있다.\n\n` +
+        `${club.name}(${club.league}) 소속으로 뽑혔다. 소집 명단에는 나보다 유명한 이름이 스무 개 넘게 있다.`
+      : `${g.world.year} 월드컵 최종 명단이 발표됐다. 이름이 없다.\n\n` +
+        `예비 명단 마지막 줄에 있었다는 건 나중에 알았다.`;
   },
   choices: (g) => {
     if (!g.flags._wcIn) return [{ t: 'TV로 본다.', meta: '자신감 − · 독기 +', risk: 'SAFE', parent: -1, injury: 0, tags: [],
@@ -2161,12 +2393,41 @@ function beginTurn(g) {
   const age = ageOf(g);
   pushLog(g, 'period', periodLabel(g));
 
+  // ── 문제 5 수정: 임대 만료 시 원소속으로 복귀한다 (이전에는 임대처에 영구 잔류)
+  if (g.player.loanFrom && g.world.phase === 'SUMMER' && g.world.year >= (g.player.loanUntil ?? 0)) {
+    const from = g.player.loanFrom;
+    const back = CLUBS.find((c) => c.id === from.id) || from;
+    const loanClub = g.player.club;
+    g.player.loanFrom = null; g.player.loanUntil = null;
+    g.player.club = { ...back };
+    g.player.contractUntil = Math.max(g.player.contractUntil || 0, g.world.year + 1);
+    g.npcs.coach = { trust: clamp(46 + g.rng.norm(0, 9), 10, 88) };
+    g.player.path.push(`${g.world.year} ${back.name} 복귀`);
+    pushLog(g, 'transfer',
+      `임대 종료 — ${loanClub.name}에서 ${back.name}으로 복귀했다.\n` +
+      `팀 평균 ${teamAvgAt(back, g.world.year)} · 내 능력 ${ability(g)}. 감독은 처음부터 다시 봐야 한다.`);
+    setNews(g, `${g.world.year}년: 임대를 마치고 ${back.name}으로 복귀했다.`);
+  }
+
   const h = HISTORY[g.world.year];
   if (h && g.world.phase === 'SUMMER' && !g.flags[`_h${g.world.year}`]) {
     g.flags[`_h${g.world.year}`] = true;
     pushLog(g, 'history', h.t.map((x) => `◆ ${x}`).join('\n'));
     if (h.money) g.player.econ.household = clamp(g.player.econ.household + h.money, 0, 100);
     if (h.boom) g.world.boom += h.boom;
+  }
+
+  // 부모 상태 갱신 — 실직 후 재취업하거나, 나이가 차면 은퇴한다
+  const fa = g.npcs.father.age1990 + (g.world.year - 1990);
+  if (g.npcs.father.status === '실직' && g.world.year - (g.npcs.father.statusYear || 0) >= 2) {
+    if (fa >= 65) { g.npcs.father.status = '은퇴'; pushLog(g, 'parent', `아버지가 일을 완전히 놓았다. ${fa}세.`); }
+    else if (g.rng.chance(0.35)) {
+      g.npcs.father.status = '재취업';
+      g.npcs.father.job = g.rng.pick(FAMILY_ENVS[g.player.env].jobs);
+      pushLog(g, 'parent', `아버지가 다시 일을 구했다. ${g.npcs.father.job}. 예전 급여의 절반이다.`);
+    }
+  } else if (!g.npcs.father.status && fa >= 66) {
+    g.npcs.father.status = '은퇴';
   }
 
   applyGrowth(g);
@@ -2351,7 +2612,7 @@ function classify(g) {
   // T1은 발롱도르로 잠근다 — 난이도를 낮춰도 GOAT가 흔해지지 않게
   if (p.awards.ballonDor >= 1) return 'T1';
   if (div === 1 && rep >= 80 && peakRep > 66 && apps > 260) return 'T2';   // 빅클럽 주축
-  if (div === 1 && apps > 420) return 'T3';                                  // 1부 정착
+  if (div === 1 && apps > 330) return 'T3';                                  // 1부 정착
   if (div === 1 && apps > 40) return 'T4';                                   // 1부를 밟았으나 정착 실패
   if (apps > 200) return 'T5';
   return 'T6';
@@ -2392,7 +2653,7 @@ function finish(g) {
       debt: p.econ.debt > 0 ? fmtMoney(p.econ.debt) : '없음',
       totalEarned: fmtMoney(p.econ.totalEarned),
       assets: fmtMoney(p.econ.assets),
-      peakSalary: fmtMoney(Math.max(0, ...p.career.seasons.map((s) => s.salary || 0))),
+      peakSalary: fmtWeekly(Math.max(0, ...p.career.seasons.map((s) => s.salary || 0))),
       peakOvr: round(p.peakOvr), finalOvr: round(p.ovr),
       revealedPotential: p.hidden.potential,
       unrealized: Math.max(0, round(p.hidden.potential - p.peakOvr)),
@@ -2422,6 +2683,9 @@ function careerTable(g) {
       prev.rating = +(((prev.rating * prev._n) + s.rating) / (prev._n + 1)).toFixed(2);
       prev._n += 1;
       prev.salary = Math.max(prev.salary, s.salary);
+      if (s.finish) { prev.finish = s.finish; prev.size = s.size; }
+      if (s.ucl) prev.ucl = s.ucl;
+      if (s.ntCaps) { prev.ntCaps = s.ntCaps; prev.ntName = s.ntName; }
       for (const a of s.ach) if (!prev.ach.includes(a)) prev.ach.push(a);
     } else {
       rows.set(key, {
@@ -2429,10 +2693,20 @@ function careerTable(g) {
         age: s.age, club: s.club, league: s.league, div: s.div,
         apps: s.apps, goals: s.goals, assists: s.assists, rating: s.rating,
         salary: s.salary, ach: [...s.ach], _n: 1,
+        finish: s.finish, size: s.size, ucl: s.ucl, ntCaps: s.ntCaps, ntName: s.ntName,
       });
     }
   }
-  return [...rows.values()].map((r) => { delete r._n; return { ...r, salaryText: r.salary ? fmtMoney(r.salary) : '-' }; });
+  return [...rows.values()].map((r) => {
+    delete r._n;
+    return {
+      ...r,
+      salaryText: r.salary ? fmtWeekly(r.salary) : '-',
+      finishText: r.finish ? `${r.finish}위/${r.size}` : '-',
+      uclText: r.ucl || '-',
+      ntText: r.ntCaps ? `${r.ntName} ${r.ntCaps}캡` : '-',
+    };
+  });
 }
 
 /* ─────────────────────────── 15. 대시보드 ─────────────────────────── */
@@ -2458,11 +2732,13 @@ function dashboard(g) {
       env: FAMILY_ENVS[p.env].label,
       personality: PARENT_PERSONALITIES[p.personality].label,
       reaction: r.label, reactionIdx: g.world.reaction, reactionBlurb: r.blurb,
-      father: `${g.npcs.father.name} · ${g.npcs.father.job}`,
+      father: `${g.npcs.father.name} · ${g.npcs.father.status ? `${g.npcs.father.status}${g.npcs.father.status === '재취업' ? ` (${g.npcs.father.job})` : ''}` : g.npcs.father.job}`,
       mother: `${g.npcs.mother.name} · ${g.npcs.mother.job}`,
+      household: g.player.econ.household >= 65 ? '안정' : g.player.econ.household >= 38 ? '보통' : '어려움',
     },
     econ: {
-      wage: p.econ.wageYear ? fmtMoney(p.econ.wageYear) : '-',
+      wage: p.econ.wageYear ? fmtWeekly(p.econ.wageYear) : '-',
+      wageYearly: p.econ.wageYear ? fmtMoney(p.econ.wageYear) : '-',
       assets: fmtMoney(p.econ.assets),
       debt: p.econ.debt > 0 ? `${fmtMoney(p.econ.debt)} (이자 ${Math.round(p.econ.debtRate * 100)}%)` : '없음',
       hasDebt: p.econ.debt > 0,
@@ -2476,6 +2752,7 @@ function dashboard(g) {
     contract: p.contractUntil ? `${p.contractUntil}년까지` : '-',
     career: { apps: p.career.apps, goals: p.career.goals, assists: p.career.assists, caps: p.career.caps, reputation: round(p.reputation) },
     table: careerTable(g),
+    climate: marketClimate(g).notes,
     news: g.news.slice(0, 5),
     trophies: p.career.trophies.slice(-6),
   };
@@ -2684,11 +2961,14 @@ function renderDash(g) {
   s2.appendChild(kv('어머니', d.family.mother, 'mute'));
   s2.appendChild(kv('부모 성향', d.family.personality, 'gold'));
   s2.appendChild(kv('형', d.sibling, 'mute'));
+  s2.appendChild(kv('가계 상태', d.family.household,
+    d.family.household === '안정' ? 'good' : d.family.household === '어려움' ? 'bad' : 'warn'));
   card.appendChild(s2);
 
   // 경제 / 통산
   const s3 = sec('수입 / 통산');
-  s3.appendChild(kv('연봉', d.econ.wage, 'good'));
+  s3.appendChild(kv('주급', d.econ.wage, 'good'));
+  s3.appendChild(kv('연봉 환산', d.econ.wageYearly, 'mute'));
   s3.appendChild(kv('누적 자산', d.econ.assets, 'good'));
   s3.appendChild(kv('부채', d.econ.debt, d.econ.hasDebt ? 'bad' : 'mute'));
   s3.appendChild(kv('경기 / 골 / 도움', `${d.career.apps} / ${d.career.goals} / ${d.career.assists}`));
@@ -2718,6 +2998,12 @@ function renderDash(g) {
     card.appendChild(s5);
   }
 
+  if (d.climate && d.climate.length) {
+    const sc = sec('이적시장 기후');
+    d.climate.forEach((t) => sc.appendChild(el('div', 'muted', '· ' + t)));
+    card.appendChild(sc);
+  }
+
   const s6 = sec('선수 근황');
   const ul = el('ul', 'news');
   d.news.forEach((n) => ul.appendChild(el('li', null, n.text)));
@@ -2733,7 +3019,8 @@ function careerTableEl(rows) {
   const wrap = el('div', 'tbl-wrap');
   const t = el('table', 'career');
   const thead = el('thead'); const htr = el('tr');
-  ['시즌', '소속팀', '리그', '출전', '골', '도움', '평점', '연봉', '트로피/업적'].forEach((h) => htr.appendChild(el('th', null, h)));
+  ['시즌', '소속팀', '리그', '순위', '출전', '골', '도움', '평점', '주급', '클럽대항전', '국가대항전', '트로피/업적']
+    .forEach((h) => htr.appendChild(el('th', null, h)));
   thead.appendChild(htr); t.appendChild(thead);
   const tb = el('tbody');
   for (const r of rows) {
@@ -2741,11 +3028,14 @@ function careerTableEl(rows) {
     tr.appendChild(el('td', null, r.season));
     tr.appendChild(el('td', 'club', r.club));
     tr.appendChild(el('td', 'lg', `${r.league.replace(/\s*\(.*\)$/, '')} ${r.div}부`));
+    tr.appendChild(el('td', 'rank', r.finishText));
     tr.appendChild(el('td', null, String(r.apps)));
     tr.appendChild(el('td', null, String(r.goals)));
     tr.appendChild(el('td', null, String(r.assists)));
     tr.appendChild(el('td', null, r.rating.toFixed(2)));
     tr.appendChild(el('td', 'sal', r.salaryText));
+    tr.appendChild(el('td', 'cup', r.uclText));
+    tr.appendChild(el('td', 'nt', r.ntText));
     tr.appendChild(el('td', 'ach', r.ach.join(', ') || '—'));
     tb.appendChild(tr);
   }
@@ -2786,7 +3076,17 @@ function renderGame() {
   const logCard = el('div', 'card');
   const log = el('div', 'log');
   for (const b of g.log) log.appendChild(el('div', 'blk ' + b.kind, b.text));
+  if (g.pending) log.appendChild(el('div', 'blk log-end', '── 현재 상황 ──'));
   logCard.appendChild(log);
+
+  // 문제 4·7 수정: 이벤트 본문은 선택 "전에" 보여야 한다.
+  // 이전에는 choose() 시점에만 로그에 들어가서, 플레이어는 본문 없이 선택지만 봤다.
+  if (g.pending && g.pending.body) {
+    const now = el('div', 'now');
+    now.appendChild(el('div', 'now-tag', periodLabel(g)));
+    now.appendChild(el('div', 'now-body', g.pending.body));
+    logCard.appendChild(now);
+  }
 
   if (g.pending) {
     const ch = el('div', 'choices');

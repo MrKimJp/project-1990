@@ -144,11 +144,14 @@ function renderDash(g) {
   s2.appendChild(kv('어머니', d.family.mother, 'mute'));
   s2.appendChild(kv('부모 성향', d.family.personality, 'gold'));
   s2.appendChild(kv('형', d.sibling, 'mute'));
+  s2.appendChild(kv('가계 상태', d.family.household,
+    d.family.household === '안정' ? 'good' : d.family.household === '어려움' ? 'bad' : 'warn'));
   card.appendChild(s2);
 
   // 경제 / 통산
   const s3 = sec('수입 / 통산');
-  s3.appendChild(kv('연봉', d.econ.wage, 'good'));
+  s3.appendChild(kv('주급', d.econ.wage, 'good'));
+  s3.appendChild(kv('연봉 환산', d.econ.wageYearly, 'mute'));
   s3.appendChild(kv('누적 자산', d.econ.assets, 'good'));
   s3.appendChild(kv('부채', d.econ.debt, d.econ.hasDebt ? 'bad' : 'mute'));
   s3.appendChild(kv('경기 / 골 / 도움', `${d.career.apps} / ${d.career.goals} / ${d.career.assists}`));
@@ -178,6 +181,12 @@ function renderDash(g) {
     card.appendChild(s5);
   }
 
+  if (d.climate && d.climate.length) {
+    const sc = sec('이적시장 기후');
+    d.climate.forEach((t) => sc.appendChild(el('div', 'muted', '· ' + t)));
+    card.appendChild(sc);
+  }
+
   const s6 = sec('선수 근황');
   const ul = el('ul', 'news');
   d.news.forEach((n) => ul.appendChild(el('li', null, n.text)));
@@ -193,7 +202,8 @@ function careerTableEl(rows) {
   const wrap = el('div', 'tbl-wrap');
   const t = el('table', 'career');
   const thead = el('thead'); const htr = el('tr');
-  ['시즌', '소속팀', '리그', '출전', '골', '도움', '평점', '연봉', '트로피/업적'].forEach((h) => htr.appendChild(el('th', null, h)));
+  ['시즌', '소속팀', '리그', '순위', '출전', '골', '도움', '평점', '주급', '클럽대항전', '국가대항전', '트로피/업적']
+    .forEach((h) => htr.appendChild(el('th', null, h)));
   thead.appendChild(htr); t.appendChild(thead);
   const tb = el('tbody');
   for (const r of rows) {
@@ -201,11 +211,14 @@ function careerTableEl(rows) {
     tr.appendChild(el('td', null, r.season));
     tr.appendChild(el('td', 'club', r.club));
     tr.appendChild(el('td', 'lg', `${r.league.replace(/\s*\(.*\)$/, '')} ${r.div}부`));
+    tr.appendChild(el('td', 'rank', r.finishText));
     tr.appendChild(el('td', null, String(r.apps)));
     tr.appendChild(el('td', null, String(r.goals)));
     tr.appendChild(el('td', null, String(r.assists)));
     tr.appendChild(el('td', null, r.rating.toFixed(2)));
     tr.appendChild(el('td', 'sal', r.salaryText));
+    tr.appendChild(el('td', 'cup', r.uclText));
+    tr.appendChild(el('td', 'nt', r.ntText));
     tr.appendChild(el('td', 'ach', r.ach.join(', ') || '—'));
     tb.appendChild(tr);
   }
@@ -246,7 +259,17 @@ function renderGame() {
   const logCard = el('div', 'card');
   const log = el('div', 'log');
   for (const b of g.log) log.appendChild(el('div', 'blk ' + b.kind, b.text));
+  if (g.pending) log.appendChild(el('div', 'blk log-end', '── 현재 상황 ──'));
   logCard.appendChild(log);
+
+  // 문제 4·7 수정: 이벤트 본문은 선택 "전에" 보여야 한다.
+  // 이전에는 choose() 시점에만 로그에 들어가서, 플레이어는 본문 없이 선택지만 봤다.
+  if (g.pending && g.pending.body) {
+    const now = el('div', 'now');
+    now.appendChild(el('div', 'now-tag', periodLabel(g)));
+    now.appendChild(el('div', 'now-body', g.pending.body));
+    logCard.appendChild(now);
+  }
 
   if (g.pending) {
     const ch = el('div', 'choices');
