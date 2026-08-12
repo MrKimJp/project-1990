@@ -48,9 +48,10 @@ function renderStart() {
 
   const lede = el('div', 'lede');
   lede.innerHTML =
-    '1990년 바르셀로나에서 태어난 한 아이의 인생을 <em>0세부터 36세까지</em> 시뮬레이션한다.<br>' +
-    '경기를 직접 플레이하지 않는다. 대신 <em>부모를 설득하고, 매 시즌 이적시장에서 팀을 고르고, 부상을 견디고, 은퇴를 결정한다.</em><br>' +
-    '<span class="muted">가정환경·부모 성향·포지션은 무작위로 주어진다. 잠재력은 은퇴할 때까지 공개되지 않는다.</span>';
+    '1990년 바르셀로나 출생. <em>만 16세, 프로가 되기 위한 첫 여름부터</em> 시작한다.<br>' +
+    '0~15세는 플레이하지 않지만 시뮬레이션은 돌아간다 — 그 결과가 <em>배경설정</em>으로 주어진다.<br>' +
+    '<em>매 시즌 이적시장에서 팀을 고르고, 팀 평균 능력과 자신을 비교하고, 부상과 빚을 견디고, 은퇴를 결정한다.</em><br>' +
+    '<span class="muted">28세에 능력이 피크를 찍고 이후 하락한다. 잠재력은 은퇴할 때까지 공개되지 않는다.</span>';
   root.appendChild(lede);
 
   if (!UI.preview) UI.preview = newGame({ seed: (Math.random() * 2 ** 31) | 0 });
@@ -126,7 +127,14 @@ function renderDash(g) {
   s1.appendChild(kv('컨디션', d.condition));
   s1.appendChild(kv('멘탈', d.mental, d.mental === '최상' ? 'good' : d.mental === '불안' ? 'bad' : d.mental === '흔들림' ? 'warn' : ''));
   s1.appendChild(kv('신체 건강', d.health, d.health === '건강' ? 'good' : 'bad'));
+  if (d.teamAvg != null) {
+    s1.appendChild(kv('팀 평균 능력', `${d.teamAvg} (내 능력 ${d.ability})`, d.ability >= d.teamAvg ? 'good' : 'warn'));
+    s1.appendChild(kv('팀 내 위치', d.fit, d.fit === '즉시 주전' ? 'good' : d.fit === '전력 외' ? 'bad' : ''));
+  }
   if (d.club !== '무소속') s1.appendChild(kv('감독 신뢰', String(d.coach), d.coach > 65 ? 'good' : d.coach < 35 ? 'bad' : ''));
+  if (d.injuries.length) {
+    s1.appendChild(kv('부상 이력', d.injuries.map((x) => `${x.name}(-${x.ovrLoss})`).join(', '), 'bad'));
+  }
   card.appendChild(s1);
 
   // 부모 및 가정
@@ -135,17 +143,14 @@ function renderDash(g) {
   s2.appendChild(kv('아버지', d.family.father, 'mute'));
   s2.appendChild(kv('어머니', d.family.mother, 'mute'));
   s2.appendChild(kv('부모 성향', d.family.personality, 'gold'));
-  s2.appendChild(kv('축구 반응', d.family.reaction, d.family.reactionIdx >= 2 ? 'good' : d.family.reactionIdx === 0 ? 'bad' : 'warn'));
-  const pips = el('div', 'pips');
-  for (let i = 0; i < 4; i++) pips.appendChild(el('i', i <= d.family.reactionIdx ? 'on' : ''));
-  s2.appendChild(pips);
-  s2.appendChild(el('div', 'muted', d.family.reactionBlurb));
+  s2.appendChild(kv('형', d.sibling, 'mute'));
   card.appendChild(s2);
 
   // 경제 / 통산
   const s3 = sec('수입 / 통산');
   s3.appendChild(kv('연봉', d.econ.wage, 'good'));
   s3.appendChild(kv('누적 자산', d.econ.assets, 'good'));
+  s3.appendChild(kv('부채', d.econ.debt, d.econ.hasDebt ? 'bad' : 'mute'));
   s3.appendChild(kv('경기 / 골 / 도움', `${d.career.apps} / ${d.career.goals} / ${d.career.assists}`));
   s3.appendChild(kv('A매치', String(d.career.caps)));
   s3.appendChild(kv('평판', String(d.career.reputation)));
@@ -156,6 +161,15 @@ function renderDash(g) {
   s4.appendChild(careerTableEl(d.table));
   card.appendChild(s4);
 
+  const aw = d.awards;
+  if (aw.ballonDor || aw.ballonTop3 || aw.uclApps) {
+    const sa = sec('개인 수상 / 유럽대항전');
+    if (aw.ballonDor) sa.appendChild(kv('발롱도르', `${aw.ballonDor}회 수상`, 'gold'));
+    if (aw.ballonTop3) sa.appendChild(kv('발롱도르 후보', `${aw.ballonTop3}회`, 'gold'));
+    if (aw.uclApps) sa.appendChild(kv('UCL 참가', `${aw.uclApps}시즌`));
+    if (aw.uclTitles) sa.appendChild(kv('UCL 우승', `${aw.uclTitles}회`, 'gold'));
+    card.appendChild(sa);
+  }
   if (d.trophies.length) {
     const s5 = sec('트로피 / 수상');
     const chips = el('div', 'chips');
@@ -201,23 +215,20 @@ function careerTableEl(rows) {
 
 /* ─────────── 우측 서사 + 선택지 배지 ─────────── */
 
-const RISK_LABEL = { SAFE: 'SAFE', MID: 'MID', HIGH: 'HIGH' };
-
 function choiceButton(c, i, onPick) {
   const b = el('button', 'choice-btn');
   const hd = el('div', 'hd');
   hd.appendChild(el('span', 'n', `[${i + 1}]`));
   hd.appendChild(el('span', null, c.t));
   b.appendChild(hd);
+  // 위험도·부모 반응 배지는 제거했다. 대신 실제 수치 결과만 보여준다.
   if (c.meta) b.appendChild(el('div', 'meta', c.meta));
-  const bd = el('div', 'badges');
-  const risk = c.risk || 'MID';
-  bd.appendChild(el('span', 'bdg ' + risk.toLowerCase(), `위험도 ${RISK_LABEL[risk]}`));
-  if (c.parent > 0) bd.appendChild(el('span', 'bdg p-up', `부모 반응 +${c.parent}`));
-  else if (c.parent < 0) bd.appendChild(el('span', 'bdg p-dn', `부모 반응 ${c.parent}`));
-  else bd.appendChild(el('span', 'bdg', '부모 반응 —'));
-  if (c.injury > 0) bd.appendChild(el('span', 'bdg inj', '부상 위험 ' + '▲'.repeat(c.injury)));
-  b.appendChild(bd);
+  if (c.fit) {
+    const bd = el('div', 'badges');
+    const cls = c.fit.d >= 4 ? 'safe' : c.fit.d >= -4 ? 'mid' : 'high';
+    bd.appendChild(el('span', 'bdg ' + cls, c.fit.label));
+    b.appendChild(bd);
+  }
   b.onclick = onPick;
   return b;
 }
@@ -248,11 +259,6 @@ function renderGame() {
 
   const tools = el('div', 'card');
   const tr = el('div', 'row');
-  if (ageOf(g) < 18) {
-    const skip = el('button', 'btn', '유년기 건너뛰고 18세로 →');
-    skip.onclick = () => { skipToEighteen(g); render(); };
-    tr.appendChild(skip);
-  }
   const auto1 = el('button', 'btn ghost', '이 턴 자동 선택');
   auto1.onclick = () => { autoStep(g); render(); };
   const restart = el('button', 'btn ghost', '처음부터');
@@ -300,8 +306,17 @@ function renderEnding() {
   R.appendChild(kv('전성기 능력', String(b.peakOvr), 'gold'));
   R.appendChild(kv('잠재력(PA) 최초 공개', String(b.revealedPotential), 'warn'));
   R.appendChild(kv('쓰지 못한 재능', `-${b.unrealized}`, b.unrealized > 12 ? 'bad' : 'mute'));
+  R.appendChild(kv('발롱도르', b.awards.ballonDor ? `${b.awards.ballonDor}회` : '없음', b.awards.ballonDor ? 'gold' : 'mute'));
+  R.appendChild(kv('UCL 우승 / 참가', `${b.awards.uclTitles}회 / ${b.awards.uclApps}시즌`));
+  R.appendChild(kv('통산 수령액', b.totalEarned, 'good'));
+  R.appendChild(kv('남은 부채', b.debt, b.debt === '없음' ? 'mute' : 'bad'));
   gr.appendChild(L); gr.appendChild(R); c.appendChild(gr);
 
+  if (b.injuries.length) {
+    const si = sec('주요 부상 이력');
+    b.injuries.forEach((x) => si.appendChild(kv(`${x.year}년 (만 ${x.age}세)`, `${x.name} · ${x.weeks}주 · 능력 -${x.ovrLoss}`, 'bad')));
+    c.appendChild(si);
+  }
   const q = sec('결정적 장면');
   q.appendChild(kv('전환점', b.turning));
   q.appendChild(kv('가장 후회되는 순간', b.regret));

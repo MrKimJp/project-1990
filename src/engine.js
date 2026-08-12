@@ -299,6 +299,90 @@ function deriveClub(name, rep, lg) {
 }
 
 export const CLUBS = LEAGUES.flatMap((lg) => lg.clubs.map(([n, r]) => deriveClub(n, r, lg)));
+
+/**
+ * 시대 곡선 (Era Curve) — 클럽의 힘은 연도에 따라 변한다.
+ * [연도, 명성 보정] 점들 사이를 선형 보간한다.
+ * 실제 역사적 성적을 근거로 했지만 수치 자체는 이 게임의 창작 밸런스 값이다.
+ */
+const ERA = {
+  'Real Madrid': [[1995, -4], [2002, 3], [2010, 0], [2017, 3], [2024, 2]],
+  'FC Barcelona': [[1995, -6], [2003, -3], [2009, 4], [2015, 3], [2021, -6], [2024, -2]],
+  'Atlético Madrid': [[1996, 2], [2000, -26], [2003, -12], [2014, 4], [2021, 3]],
+  'Valencia CF': [[1996, -4], [2001, 10], [2004, 8], [2012, -6], [2022, -18]],
+  'Sevilla FC': [[1995, -18], [2004, -4], [2007, 6], [2016, 4], [2024, -8]],
+  'Villarreal CF': [[1995, -30], [2002, -8], [2006, 6], [2011, 2], [2021, 4]],
+  'Real Betis': [[1995, -6], [2005, 2], [2011, -12], [2019, 0], [2024, 4]],
+  'Deportivo La Coruña': [[1995, 6], [2000, 16], [2004, 10], [2011, -6], [2020, -18]],
+  'Real Zaragoza': [[1995, 6], [2004, 4], [2013, -12], [2020, -18]],
+  'RCD Espanyol': [[1995, -2], [2007, 4], [2016, -6], [2023, -12]],
+  'Girona FC': [[1995, -34], [2010, -22], [2018, -6], [2024, 4]],
+  'Manchester City': [[1995, -26], [2004, -18], [2009, 2], [2014, 8], [2019, 10]],
+  'Manchester United': [[1995, 4], [1999, 8], [2008, 8], [2014, -6], [2023, -10]],
+  'Chelsea': [[1995, -16], [2004, 4], [2012, 6], [2017, 2], [2023, -8]],
+  'Arsenal': [[1995, -4], [2004, 6], [2012, -4], [2020, -4], [2024, 4]],
+  'Liverpool': [[1995, -2], [2005, 2], [2012, -6], [2019, 8], [2024, 4]],
+  'Tottenham Hotspur': [[1995, -14], [2005, -8], [2017, 2], [2024, -4]],
+  'Newcastle United': [[1996, 6], [2004, -2], [2016, -18], [2023, 2]],
+  'Leicester City': [[1995, -22], [2009, -20], [2016, 8], [2021, 2], [2024, -10]],
+  'Leeds United': [[1995, 2], [2001, 14], [2004, -20], [2010, -22], [2020, -8]],
+  'Everton': [[1995, -4], [2005, 2], [2014, 0], [2023, -12]],
+  'Inter Milan': [[1995, -2], [2005, 4], [2010, 8], [2016, -8], [2023, 4]],
+  'AC Milan': [[1995, 4], [2003, 8], [2007, 6], [2015, -16], [2022, 0]],
+  'Juventus': [[1995, 6], [2003, 8], [2007, -16], [2015, 8], [2023, -6]],
+  'Napoli': [[1995, -28], [2004, -34], [2011, 0], [2018, 4], [2023, 6]],
+  'AS Roma': [[1995, -2], [2001, 8], [2010, 2], [2019, -6]],
+  'Atalanta': [[1995, -26], [2010, -20], [2019, 4], [2024, 4]],
+  'Lazio': [[1995, 2], [2000, 10], [2008, -8], [2020, 0]],
+  'Bayern München': [[1995, 0], [2001, 4], [2013, 6], [2020, 4], [2024, 0]],
+  'Borussia Dortmund': [[1995, 4], [1997, 8], [2005, -18], [2013, 6], [2024, 0]],
+  'Bayer Leverkusen': [[1995, -6], [2002, 4], [2010, -4], [2024, 6]],
+  'RB Leipzig': [[2009, -40], [2016, -6], [2020, 2], [2024, 2]],
+  'FC Schalke 04': [[1995, -6], [2008, 4], [2018, -6], [2023, -22]],
+  'Hamburger SV': [[1995, 2], [2006, 2], [2014, -10], [2020, -14]],
+  'Werder Bremen': [[1995, 0], [2004, 8], [2012, -8], [2022, -10]],
+  'Paris Saint-Germain': [[1995, -4], [2004, -14], [2011, -6], [2015, 6], [2022, 8]],
+  'AS Monaco': [[1995, 4], [2004, 6], [2011, -22], [2017, 6], [2024, -2]],
+  'Olympique Lyonnais': [[1995, -6], [2002, 10], [2008, 6], [2018, -4], [2024, -12]],
+  'Olympique de Marseille': [[1995, -8], [2010, 4], [2018, -4], [2024, -2]],
+  'Lille OSC': [[1995, -14], [2005, 2], [2011, 4], [2021, 4], [2024, -2]],
+  'AFC Ajax': [[1995, 10], [2001, -2], [2010, -4], [2019, 6], [2024, -12]],
+  'PSV Eindhoven': [[1995, 4], [2005, 4], [2015, 0], [2024, 0]],
+  'FC Porto': [[1995, 0], [2004, 8], [2011, 6], [2020, 0]],
+  'SL Benfica': [[1995, -4], [2006, 0], [2014, 4], [2024, 2]],
+  'Sporting CP': [[1995, -2], [2002, 2], [2013, -8], [2021, 4]],
+  'Inter Miami CF': [[2020, -30], [2023, -4], [2024, 2]],
+  'Al Hilal': [[1995, -30], [2010, -18], [2020, -6], [2023, 6]],
+  'Al Nassr': [[1995, -30], [2010, -18], [2022, -8], [2023, 6]],
+};
+/** 창단/승격 이전에는 존재하지 않는 클럽 */
+const CLUB_FROM = {
+  'RB Leipzig': 2010, 'Inter Miami CF': 2020, 'LAFC': 2018, 'Austin FC': 2021,
+  'FC Cincinnati': 2019, '광주 FC': 2011, 'Girona FC': 2008, 'FC Andorra': 2015,
+  'Union Saint-Gilloise': 2015, 'Casa Pia AC': 2020, 'Estrela da Amadora': 2020,
+};
+
+function interpEra(pts, year) {
+  if (!pts || !pts.length) return 0;
+  if (year <= pts[0][0]) return pts[0][1];
+  if (year >= pts[pts.length - 1][0]) return pts[pts.length - 1][1];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [y0, m0] = pts[i], [y1, m1] = pts[i + 1];
+    if (year >= y0 && year <= y1) return m0 + ((m1 - m0) * (year - y0)) / (y1 - y0);
+  }
+  return 0;
+}
+/** 해당 연도의 클럽 명성 */
+export function clubRepAt(club, year) {
+  return clamp(club.rep + interpEra(ERA[club.name], year), 12, 99);
+}
+/** 해당 연도의 팀 평균 능력(overall). 입단 판정의 기준값이다. */
+export function teamAvgAt(club, year) {
+  return clamp(round(28 + clubRepAt(club, year) * 0.60), 30, 90);
+}
+export function clubExists(club, year) {
+  return year >= (CLUB_FROM[club.name] ?? 1900);
+}
 export const LEAGUE_LIST = LEAGUES.map((l) => ({ id: l.id, name: l.name, nat: l.nat, div: l.div, size: l.clubs.length }));
 export const CLUB_COUNT = CLUBS.length;
 const clubById = (id) => CLUBS.find((c) => c.id === id);
@@ -400,7 +484,8 @@ export function newGame(opts = {}) {
     { w: 14, v: 'AM' }, { w: 16, v: 'WG' }, { w: 13, v: 'ST' },
   ]).v;
 
-  const potential = clamp(round(57 + rng.rightSkew(1.9) * 40 + rng.norm(0, 2)), 52, 96);
+  // 난이도 하향: 잠재력 분포를 상향한다 (1부 정착 40~50% 목표)
+  const potential = clamp(round(63 + rng.rightSkew(1.55) * 36 + rng.norm(0, 2)), 58, 99);
 
   // 초기 부모 반응 — 성향 + 가정환경의 안전망 압력으로 결정된다
   let react = 1 + pers.bias - (env.safety > 70 ? 1 : 0);
@@ -426,7 +511,8 @@ export function newGame(opts = {}) {
     confidence: 50, stress: 20, fitness: 100, form: 55,
     willToPlay: 68, academic: clamp(round(env.academic + rng.norm(0, 8)), 10, 98),
     trait: { ambition: 50, pride: 50, loyalty: 50, adaptability: 50, risk: 50 },
-    econ: { wageYear: 0, assets: 0, household: env.money },
+    econ: { wageYear: 0, assets: 0, household: env.money, debt: 0, debtRate: 0, totalEarned: 0 },
+    awards: { ballonDor: 0, ballonTop3: 0, uclTitles: 0, uclApps: 0, goldenBoot: 0, leagueMVP: 0, topScorer: 0 },
     club: null, loanFrom: null, contractUntil: null,
     reputation: 2, peakReputation: 0,
     ntTeam: null, ntLocked: false, injuryWeeks: 0,
@@ -437,7 +523,17 @@ export function newGame(opts = {}) {
   const g = {
     version: 3, seed, rng, player: p,
     world: { year: 1990, phase: 'SUMMER', reaction: react, academyAccess: 0, boom: 0 },
-    npcs: { father, mother, coach: { trust: 50 }, agent: null },
+    npcs: {
+      father, mother, coach: { trust: 50 }, agent: null,
+      // 형 — 별도 트랙으로 진행되는 서브플롯
+      sibling: {
+        name: bg ? `${rng.pick(bg.first)} ${surname}` : `${rng.pick(SPANISH_FIRST)} ${surname}`,
+        age1990: rng.int(2, 6),
+        state: 'STABLE',      // STABLE → DRIFT → SLUM → INCIDENT → (RECOVER|PRISON|DEAD)
+        risk: clamp(round(rng.norm(env.safety < 30 ? 58 : 32, 16)), 5, 92),
+        helped: 0,
+      },
+    },
     memories: [], flags: {}, log: [], news: [],
     pending: null, turn: 0, over: false, ending: null,
   };
@@ -450,11 +546,80 @@ export function newGame(opts = {}) {
     `부모 성향  ${pers.label} — ${pers.blurb}\n` +
     `축구 반응  ${REACTIONS[react].label}\n` +
     `포지션     ${POSITIONS[posId].label}`);
-  pushLog(g, 'event', settlementStory(g));
-  setNews(g, '1990년: 태어났다. 아직 아무것도 결정되지 않았다.');
-
   beginTurn(g);
+  // 유년기는 플레이하지 않는다. 시뮬레이션만 돌리고 그 결과를 산문으로 제시한다.
+  runBackstory(g);
   return g;
+}
+
+/** 0~15세를 헤드리스로 진행한 뒤, 결과 상태를 산문 배경설정으로 렌더한다. */
+function runBackstory(g) {
+  let guard = 0;
+  while (!g.over && ageOf(g) < 16 && guard++ < 120) autoStep(g);
+  const prose = buildBackstory(g);
+  g.backstory = prose;
+  // 유년기 턴 로그를 지우고 배경설정으로 대체한다
+  g.log = [];
+  pushLog(g, 'header', `${g.player.name} — 1990년 7월 18일, 바르셀로나`);
+  pushLog(g, 'backstory', prose);
+  setNews(g, `${g.world.year}년: 만 16세. 프로가 되기 위한 첫 여름.`);
+}
+
+function buildBackstory(g) {
+  const p = g.player, f = g.npcs.father, m = g.npcs.mother, sib = g.npcs.sibling;
+  const env = FAMILY_ENVS[p.env];
+  const L = [];
+
+  L.push(`${p.name}. 1990년 7월 18일, 바르셀로나 산츠 지구.`);
+  L.push('');
+  if (env.immigrant) {
+    L.push(`아버지 ${f.name}은 ${p.immigrantBg}에서 왔다. 1990년 당시 ${f.age1990}세, 직업은 ${f.job}였다.`);
+    L.push(`올림픽을 앞둔 도시는 사람을 무한히 필요로 했고, 서류가 완전하지 않은 남자에게도 일을 줬다.`);
+    L.push(`어머니 ${m.name}(${m.age1990}세)은 ${m.job}으로 새벽에 나갔다. 두 사람이 벌어오는 돈으로 살았다.`);
+  } else {
+    L.push(`아버지 ${f.name}(${f.age1990}세)은 ${f.job}, 어머니 ${m.name}(${m.age1990}세)은 ${m.job}이다.`);
+    L.push(`이 도시에서 3대를 살았고, 가족 모두가 어느 팀을 응원하는지는 태어날 때 이미 정해져 있었다.`);
+  }
+  L.push(env.blurb);
+  L.push('');
+
+  if (hasMemory(g, 'no_money_youth')) {
+    L.push(`축구를 시작한 건 선택이 아니라 위치였다. 아파트 아래 골목이 경기장이었다.`);
+    L.push(`여섯 살에 동네 클럽 등록 시즌이 왔지만 회비를 내지 못했다. 몇 년을 골목에서만 찼다.`);
+  } else if (g.flags.registered) {
+    L.push(`여섯 살에 동네 클럽 유소년팀에 등록했다. 유니폼은 사이즈가 두 단계 커서 무릎까지 내려왔다.`);
+  } else {
+    L.push(`정식 등록 없이 학교와 골목에서만 찼다. 아무도 지켜보지 않는 축구였다.`);
+  }
+  if (hasMemory(g, 'promise_school')) L.push(`아홉 살에 "성적은 유지하겠다"는 조건으로 축구를 허락받았다. 그 약속은 아직 유효하다.`);
+  L.push('');
+
+  L.push(`2002년 여름, 열두 살에 FC 바르셀로나 유소년 테스트를 봤다. 400명이 왔다.`);
+  if (env.immigrant) L.push(`접수처에서 서류를 두 번 확인받았다. 앞의 아이들은 한 번이었다.`);
+  if (hasMemory(g, 'academy_in')) {
+    L.push(`합격했다. 라 마시아 숙소에 짐을 풀었다. 같은 방 아이 셋 다 자기 지역에서 제일 잘하는 애였다.`);
+  } else if (hasMemory(g, 'rejection')) {
+    L.push(`사흘 뒤 리포트가 왔다. 불합격.`);
+    L.push('');
+    L.push(`  "나쁜 선수가 아니다. 다만 현재 신체조건과 포지션 경쟁을 고려하면,`);
+    L.push(`   지금 우리 시스템에 넣어야 할 필연성이 낮다."`);
+    L.push('');
+    L.push(`그 문장을 종이에 적어 서랍에 넣었다. 지금도 거기 있다.`);
+  }
+  L.push('');
+
+  const yc = p.club ? p.club.name : '무소속';
+  L.push(`이후 ${yc} 유소년팀에서 뛰었다.`);
+  const inj = (p.career.injuries || [])[0];
+  if (inj) L.push(`${inj.age}세에 ${inj.name}으로 ${inj.weeks}주를 쉬었다. 그때 몸이 예전과 달라졌다.`);
+  if (sib.state !== 'STABLE') L.push(`형 ${sib.name}은 학교를 그만뒀다. 동네에서 형의 이름이 다르게 불리기 시작했다.`);
+  L.push(`학업은 ${p.academic >= 65 ? '상위권으로 유지했다' : p.academic >= 45 ? '중간 정도였다' : '거의 놓았다'}.`);
+  L.push('');
+
+  L.push(`${g.world.year}년 여름. 만 16세. 후베닐 계약이 끝난다.`);
+  L.push(`현재 능력 ${ability(g)} (${abilityLabel(ability(g))}) · 소속 ${yc}`);
+  L.push(`이 도시에서 유소년 등록 선수가 프로 계약에 도달하는 비율은 1% 아래다. 여기서부터가 시작이다.`);
+  return L.join('\n');
 }
 
 /** 1990년 바르셀로나 정착 에피소드 */
@@ -543,17 +708,27 @@ function advanceClock(g) {
 
 /* ─────────────────────────── 8. 성장 ─────────────────────────── */
 
+/**
+ * 성장 커브 — 16~23세가 최성장기, 28세에 피크를 찍고 이후 하락한다.
+ */
 function growthCurve(age, lateBloomer) {
-  const a = lateBloomer ? age - 3 : age;
+  const a = lateBloomer ? age - 2 : age;
   if (a < 6) return 0;
   if (a < 8) return 0.9;
   if (a < 12) return 1.9;
-  if (a < 16) return 2.6;
-  if (a < 20) return 2.3;
-  if (a < 24) return 1.25;
-  if (a < 27) return 0.5;
-  if (a < 30) return 0.16;
+  if (a < 16) return 2.5;
+  if (a < 20) return 3.0;   // 16~19 최성장
+  if (a < 24) return 2.7;   // 20~23 최성장
+  if (a < 26) return 1.15;
+  if (a < 28) return 0.6;
+  if (a < 29) return 0.22;  // 28세 피크
   return 0;
+}
+/** 28세 피크 이후 매년 하락 */
+export const PEAK_AGE = 28;
+function declineFor(g, age, years) {
+  const p = g.player;
+  return years * (0.35 + Math.max(0, age - PEAK_AGE) * 0.30) * (1 + (60 - p.hidden.pro) / 200);
 }
 
 function trainingQuality(g) {
@@ -570,7 +745,8 @@ function trainingQuality(g) {
 /** 환경 천장 — 잠재력은 환경이 허락하는 만큼만 열린다 */
 function developmentCeiling(p) {
   const env = p.devEnv ?? 52;
-  return p.hidden.potential * clamp(0.52 + 0.48 * clamp((env - 30) / 55, 0, 1), 0.52, 1);
+  // 난이도 하향: 나쁜 환경에서도 재능이 더 많이 열린다 (하한 0.52 → 0.72)
+  return p.hidden.potential * clamp(0.72 + 0.28 * clamp((env - 30) / 55, 0, 1), 0.72, 1);
 }
 
 const GREW = [
@@ -594,8 +770,8 @@ function applyGrowth(g) {
     const tq = trainingQuality(g);
     p.devEnv = p.devEnv == null ? tq : p.devEnv * 0.78 + tq * 0.22;
   }
-  if (age >= 30) {
-    p.ovr = clamp(p.ovr - years * (0.6 + Math.max(0, age - 30) * 0.42) * (1 + (60 - p.hidden.pro) / 160), 20, 99);
+  if (age > PEAK_AGE) {
+    p.ovr = clamp(p.ovr - declineFor(g, age, years), 20, 99);
     return;
   }
   if (!p.active) return;
@@ -608,7 +784,7 @@ function applyGrowth(g) {
   const noise = 0.55 + g.rng.rightSkew(1.35) * 1.5;
   const stressPen = 1 - clamp(p.stress - 45, 0, 55) / 130;
   const injPen = p.injuryWeeks > 8 ? 0.55 : p.injuryWeeks > 0 ? 0.82 : 1;
-  const delta = clamp(years * curve * (gap / 100) * mult * noise * 5.6 * stressPen * injPen, 0, 13);
+  const delta = clamp(years * curve * (gap / 100) * mult * noise * 6.4 * stressPen * injPen, 0, 14);
   p.ovr = clamp(p.ovr + delta, 0, 99);
   p.peakOvr = Math.max(p.peakOvr, p.ovr);
 
@@ -641,6 +817,56 @@ function leagueFinish(g, club) {
   const size = lg ? lg.clubs.length : 20;
   const better = (lg ? lg.clubs : []).filter(([, r]) => r > club.rep).length;
   return { finish: clamp(round(better + 1 + g.rng.norm(0, size * 0.13)), 1, size), size };
+}
+
+/**
+ * 부상 유형표.
+ *   ovr   즉각적인 능력 하락 (선수 생명을 위협하는 부상은 5~10)
+ *   prone 이후 부상 빈도 증가폭 (재발성)
+ */
+export const INJURY_TYPES = [
+  { id: 'BRUISE',    name: '타박·염좌',      w: 34, weeks: [1, 3],   ovr: [0, 0],  prone: 0,  desc: '며칠 절뚝였다. 그 정도다.' },
+  { id: 'MUSCLE',    name: '근육 손상',      w: 22, weeks: [3, 6],   ovr: [0, 1],  prone: 2,  desc: '허벅지가 뭉쳤다. 무리한 일정의 대가다.' },
+  { id: 'ANKLE',     name: '발목 인대 파열', w: 13, weeks: [8, 16],  ovr: [1, 3],  prone: 6,  desc: '발목이 돌아갔다. 붓기가 3주 동안 빠지지 않았다.' },
+  { id: 'FRACTURE',  name: '골절',           w: 9,  weeks: [10, 20], ovr: [2, 4],  prone: 5,  desc: '뼈가 부러지는 소리를 본인이 들었다.' },
+  { id: 'HAMSTRING', name: '햄스트링 파열',  w: 12, weeks: [8, 16],  ovr: [5, 7],  prone: 14, desc: '뒤에서 누가 걷어찬 것 같았다. 아무도 없었다. 햄스트링은 한 번 찢어지면 계속 찢어진다.' },
+  { id: 'ACHILLES',  name: '아킬레스건 파열', w: 5, weeks: [28, 44], ovr: [7, 10], prone: 16, desc: '아킬레스가 끊어졌다. 뛰는 방식을 처음부터 다시 배워야 한다.' },
+  { id: 'ACL',       name: '전방십자인대(ACL) 파열', w: 5, weeks: [32, 52], ovr: [8, 10], prone: 20, desc: '무릎이 안쪽으로 접혔다. 십자인대. 이 단어를 들은 선수의 절반은 예전으로 돌아가지 못한다.' },
+];
+const SEVERE = new Set(['HAMSTRING', 'ACHILLES', 'ACL']);
+
+function rollInjury(g, age) {
+  const p = g.player;
+  // 나이가 많고 유리몸일수록 중상 비중이 올라간다
+  const severeBias = 1 + Math.max(0, age - 27) * 0.12 + (p.hidden.injuryProne - 50) / 90;
+  const t = g.rng.weighted(INJURY_TYPES.map((x) => ({
+    w: SEVERE.has(x.id) || x.id === 'FRACTURE' ? x.w * severeBias : x.w, v: x,
+  }))).v;
+
+  const weeks = g.rng.int(t.weeks[0], t.weeks[1]);
+  const ovrLoss = t.ovr[1] > 0 ? g.rng.int(t.ovr[0], t.ovr[1]) : 0;
+  p.injuryWeeks += weeks;
+  p.confidence = clamp(p.confidence - weeks * 0.5, 5, 98);
+  if (ovrLoss > 0) {
+    p.ovr = clamp(p.ovr - ovrLoss, 15, 99);
+    // 잠재력 자체도 깎인다 — 예전 몸으로는 돌아가지 못한다
+    p.hidden.potential = clamp(p.hidden.potential - Math.ceil(ovrLoss * 0.7), 40, 99);
+  }
+  if (t.prone > 0) p.hidden.injuryProne = clamp(p.hidden.injuryProne + t.prone, 8, 98);
+
+  const severe = SEVERE.has(t.id);
+  if (severe) {
+    p.willToPlay -= g.rng.int(6, 18);
+    p.career.injuries = (p.career.injuries || []);
+    p.career.injuries.push({ year: g.world.year, age, name: t.name, weeks, ovrLoss });
+    remember(g, 'major_injury', `${g.world.year}년, ${t.name}. ${weeks}주 결장, 능력 -${ovrLoss}. 커리어의 방향이 바뀌었다.`, 0.92);
+    if (g.rng.chance(clamp(0.12 + (weeks - 28) / 90 + (55 - p.willToPlay) / 200 + (age > 30 ? 0.16 : 0), 0, 0.6))) {
+      p.active = false; g.flags.injuryEnded = true;
+      p.path.push(`${g.world.year} ${t.name}으로 커리어 종료`);
+      remember(g, 'injury_retire', `${g.world.year}년, ${t.name} 끝에 선수 생활을 접었다.`, 1.0);
+    }
+  }
+  return { type: t, weeks, ovrLoss, severe };
 }
 
 function simulatePeriod(g) {
@@ -679,27 +905,29 @@ function simulatePeriod(g) {
   p.reputation = clamp(p.reputation + clamp((rating - 6.4) * 4 * (club.expo / 70) * (apps / Math.max(1, total * 0.4)) * youthCap, -6, 12), 0, 100);
   if (age >= 17) p.peakReputation = Math.max(p.peakReputation, p.reputation);
 
-  // 부상 — 조건부 확률
+  // 부상 — 운이 아니라 조건부 확률. 유형에 따라 결과가 완전히 다르다.
   const load = apps / Math.max(1, total);
-  const ageRisk = age < 18 ? 1.15 : age > 30 ? 1 + (age - 30) * 0.11 : 1;
-  let injuryNote = 0;
-  if (g.rng.chance(clamp(0.075 * periodYears(g) * 2 * (0.5 + load) * (p.hidden.injuryProne / 55) * ageRisk *
-      (1 + clamp(p.stress - 50, 0, 50) / 120), 0, 0.75))) {
-    const weeks = Math.min(64, Math.ceil(g.rng.heavyTail(1.55) * 1.7));
-    p.injuryWeeks += weeks; injuryNote = weeks;
-    p.confidence = clamp(p.confidence - weeks * 0.6, 5, 98);
-    if (weeks >= 12) shiftReaction(g, -1, '장기 부상');
-    if (weeks >= 24) {
-      p.hidden.potential = clamp(p.hidden.potential - g.rng.int(2, 7), 40, 99);
-      p.hidden.injuryProne = clamp(p.hidden.injuryProne + g.rng.int(4, 12), 8, 98);
-      p.willToPlay -= g.rng.int(8, 22);
-      remember(g, 'major_injury', `${g.world.year}년, ${weeks}주 부상. 커리어의 방향이 바뀌었다.`, 0.9);
-      if (g.rng.chance(clamp(0.20 + (weeks - 24) / 70 + (55 - p.willToPlay) / 180 + (age > 29 ? 0.2 : 0), 0, 0.75))) {
-        p.active = false; g.flags.injuryEnded = true;
-        p.path.push(`${g.world.year} 부상으로 커리어 종료`);
-        remember(g, 'injury_retire', `${g.world.year}년, ${weeks}주 부상 끝에 선수 생활을 접었다.`, 1.0);
-        pushLog(g, 'injury', '재활이 끝나지 않았다. 의사도, 구단도, 더는 다음을 말하지 않았다.');
-      }
+  const ageRisk = age < 18 ? 1.15 : age > 29 ? 1 + (age - 29) * 0.10 : 1;
+  let injuryNote = null;
+  if (g.rng.chance(clamp(0.055 * periodYears(g) * 2 * (0.5 + load) * (p.hidden.injuryProne / 55) * ageRisk *
+      (1 + clamp(p.stress - 50, 0, 50) / 120), 0, 0.62))) {
+    injuryNote = rollInjury(g, age);
+  }
+
+  // 부채 이자 — 갚지 않으면 늘어난다
+  if (p.econ.debt > 0) {
+    const interest = round(p.econ.debt * p.econ.debtRate * periodYears(g));
+    p.econ.debt += interest;
+    const pay = Math.min(p.econ.assets, round(p.econ.debt * 0.35));
+    if (pay > 0) { p.econ.assets -= pay; p.econ.debt -= pay; }
+    if (p.econ.debt <= 0) {
+      p.econ.debt = 0; p.econ.debtRate = 0;
+      p.stress = clamp(p.stress - 18, 0, 100);
+      pushLog(g, 'debt', '빚을 다 갚았다. 통장을 확인하고 한참 앉아 있었다.');
+      remember(g, 'debt_clear', `${g.world.year}년, 빚을 전부 청산했다.`, 0.8);
+    } else if (interest > 0) {
+      pushLog(g, 'debt', `부채 ${fmtMoney(p.econ.debt)} (이자 ${fmtMoney(interest)} 발생${pay ? ` · ${fmtMoney(pay)} 상환` : ''})`);
+      p.stress = clamp(p.stress + 4, 0, 100);
     }
   }
 
@@ -708,6 +936,7 @@ function simulatePeriod(g) {
     salary = salaryFor(club, p.ovr, g.world.year, p.reputation);
     p.econ.wageYear = salary;
     p.econ.assets += round(salary * periodYears(g) * 0.55);
+    p.econ.totalEarned += round(salary * periodYears(g));
     if (salary > 400000 && !g.flags.bigWage) { g.flags.bigWage = true; shiftReaction(g, 2, '자식의 연봉이 집안 수입을 넘어섰다'); }
   }
 
@@ -722,9 +951,10 @@ function simulatePeriod(g) {
       if (club.div > 1) { club.div -= 1; club.req += 6; }
       shiftReaction(g, 1, '리그 우승');
     } else if (club.div > 1 && finish <= 2) {
-      ach.push('승격'); club.div -= 1; club.req += 6;
+      ach.push('승격'); club.div -= 1; club.req += 6; g.flags.justPromoted = club.name;
     } else if (finish >= size - 2) {
       ach.push('강등'); if (club.div < 3) { club.div += 1; club.req -= 6; }
+      g.flags.justRelegated = club.name;
       shiftReaction(g, -1, '팀 강등');
     } else if (finish <= 4 && club.div === 1) {
       ach.push(`리그 ${finish}위 · 유럽대항전 진출`);
@@ -733,7 +963,18 @@ function simulatePeriod(g) {
     if (rating >= 7.9 && apps >= total * 0.6) { ach.push('리그 MVP'); p.career.trophies.push(`${g.world.year} 리그 MVP`); }
     else if (rating >= 7.55 && apps >= total * 0.6) ach.push('리그 베스트 11');
   }
-  if (injuryNote) ach.push(`부상 ${injuryNote}주`);
+  // 유럽대항전 + 개인 수상
+  if (seniorClub && doFinish) {
+    const ucl = simulateEurope(g, club, apps, total, rating);
+    if (ucl) {
+      ach.push(`UCL ${ucl.label}`);
+      pushLog(g, 'ucl', `챔피언스리그 ${ucl.label}. 평판 +${ucl.gain}.`);
+    }
+    const bd = ballonDorCheck(g, club, ucl, rating, goals, apps);
+    if (bd === 'WIN') { ach.push('발롱도르 수상'); pushLog(g, 'award', `◆ ${g.world.year} 발롱도르 수상. 이 시즌은 영구히 기록된다.`); }
+    else if (bd === 'TOP3') { ach.push('발롱도르 후보'); pushLog(g, 'award', `${g.world.year} 발롱도르 최종 후보 3인에 들었다.`); }
+  }
+  if (injuryNote) ach.push(`${injuryNote.type.name} ${injuryNote.weeks}주${injuryNote.ovrLoss ? ` (능력 -${injuryNote.ovrLoss})` : ''}`);
   if (p.loanFrom) ach.push('임대');
 
   p.career.seasons.push({
@@ -748,7 +989,13 @@ function simulatePeriod(g) {
   else if (share > 0.8) line += '\n확실한 주전이었다.';
   if (ach.length) line += `\n▸ ${ach.join(' · ')}`;
   pushLog(g, 'season', line);
-  if (injuryNote) pushLog(g, 'injury', injuryNote >= 24 ? `${injuryNote}주 아웃. 큰 부상이다.` : `${injuryNote}주 부상으로 이탈했다.`);
+  if (injuryNote) {
+    const { type, weeks, ovrLoss, severe } = injuryNote;
+    pushLog(g, 'injury',
+      `[${type.name}] ${weeks}주 결장${ovrLoss ? ` · 현재 능력 -${ovrLoss}` : ''}\n${type.desc}` +
+      (severe ? `\n이 부상 이후로 부상 빈도가 눈에 띄게 올라간다.` : ''));
+    if (!g.player.active && g.flags.injuryEnded) pushLog(g, 'injury', '재활이 끝나지 않았다. 의사도, 구단도, 더는 다음을 말하지 않았다.');
+  }
 
   // 근황 한 줄
   if (seniorClub) {
@@ -773,6 +1020,58 @@ function simulatePeriod(g) {
     p.willToPlay = clamp(p.willToPlay + dw, 0, 100);
   }
   return true;
+}
+
+/* ─────────────────────────── 9-b. 챔피언스리그 / 개인 수상 ─────────────────── */
+
+const UCL_ROUND = ['조별리그 탈락', '16강', '8강', '4강', '준우승', '우승'];
+
+/** 유럽대항전 — 소속 클럽의 그 해 명성으로 진출과 성적을 정한다 */
+function simulateEurope(g, club, apps, total, rating) {
+  const p = g.player;
+  const rep = clubRepAt(club, g.world.year);
+  if (club.div !== 1 || rep < 74 || apps < total * 0.25) return null;
+  if (!g.rng.chance(clamp((rep - 70) / 30, 0.1, 0.95))) return null;
+
+  p.awards.uclApps += 1;
+  const strength = (rep - 72) / 5 + (p.ovr - teamAvgAt(club, g.world.year)) / 6 +
+    (p.hidden.bigMatch - 50) / 14 + g.rng.norm(0, 1.5);
+  const reach = clamp(Math.round(1 + strength), 0, 5);
+  const label = UCL_ROUND[reach];
+  const gain = [1, 3, 6, 10, 14, 20][reach];
+  p.reputation = clamp(p.reputation + gain, 0, 100);
+  p.peakReputation = Math.max(p.peakReputation, p.reputation);
+  if (reach === 5) {
+    p.awards.uclTitles += 1;
+    p.career.trophies.push(`${g.world.year} 챔피언스리그 우승`);
+  }
+  return { label, reach, gain };
+}
+
+/**
+ * 발롱도르 — 매년 1명. 목표 수상 확률은 커리어당 약 5%.
+ * 클럽 수준·UCL 성적·평판·대표팀 성적을 합산한 점수로 판정한다.
+ */
+function ballonDorCheck(g, club, ucl, rating, goals, apps) {
+  const p = g.player;
+  if (!club || club.div !== 1) return null;
+  const rep = clubRepAt(club, g.world.year);
+  if (rep < 82 || p.reputation < 78) return null;
+
+  let score = (p.reputation - 78) * 2.4 + (rep - 82) * 0.8 + (rating - 7.0) * 16 + goals * 0.5;
+  if (ucl) score += [0, 4, 9, 16, 22, 34][ucl.reach];
+  if (p.ntTeam === 'ESP') score += 6;
+  if (g.flags.wcHero) score += 12;
+  score += g.rng.norm(0, 9);
+
+  if (score > 49) {
+    p.awards.ballonDor += 1;
+    p.career.trophies.push(`${g.world.year} 발롱도르 수상`);
+    remember(g, 'ballon', `${g.world.year}년 발롱도르를 받았다.`, 1.0);
+    return 'WIN';
+  }
+  if (score > 42) { p.awards.ballonTop3 += 1; p.career.trophies.push(`${g.world.year} 발롱도르 후보 3위권`); return 'TOP3'; }
+  return null;
 }
 
 /* ─────────────────────────── 10. 국가대표 ─────────────────────────── */
@@ -811,16 +1110,29 @@ function scoutedValue(g, club) {
   return p.ovr * 0.75 + (p.ovr + err) * 0.15 + (p.ovr + cond) * 0.10 + p.reputation * 0.12 + bias;
 }
 
-export function generateOffers(g, count = 4) {
+/** 그 해 팀 평균 능력 대비 내 위치 */
+export function fitLabel(g, club) {
+  const avg = teamAvgAt(club, g.world.year);
+  const d = g.player.ovr - avg;
+  if (d >= 4) return { label: '즉시 주전', d, avg };
+  if (d >= -4) return { label: '주전 경쟁', d, avg };
+  if (d >= -10) return { label: '로테이션·백업', d, avg };
+  return { label: '전력 외', d, avg };
+}
+
+export function generateOffers(g, count = 6) {
   const p = g.player;
   const age = ageOf(g);
   const pool = CLUBS.filter((c) => {
     if (p.club && c.id === p.club.id) return false;
-    const v = scoutedValue(g, c);
-    if (v < c.req - (age <= 21 ? 7 : 1)) return false;
-    // 성인 프로 계약의 절대 하한. 유소년 등록 선수 중 프로에 도달하는 비율은 1% 아래다.
-    if (age >= 16 && !c.youth && p.ovr < 50) return false;
-    if (v > c.req + 17 && c.div >= 3) return false;
+    if (c.youth || !clubExists(c, g.world.year)) return false;
+    // ── 입단 판정: 주인공 능력 vs 그 해 팀 평균 능력
+    const avg = teamAvgAt(c, g.world.year);
+    const youthDiscount = age <= 21 ? 8 : 0;   // 유망주 할인
+    if (scoutedValue(g, c) < avg - 10 - youthDiscount) return false;
+    // 성인 프로 계약의 절대 하한
+    if (age >= 16 && p.ovr < 52) return false;
+    if (p.ovr > avg + 16 && c.div >= 3) return false;
     if (c.nat !== 'ESP') {
       if (age < 18 && g.world.year >= 2001) return false; // FIFA 18세 미만 국제이적 제한
       if (p.reputation < 26 && age < 22) return false;
@@ -830,8 +1142,47 @@ export function generateOffers(g, count = 4) {
   });
   if (!pool.length) return [];
   const scored = pool.map((c) => ({
-    w: (1 / (1 + Math.abs(scoutedValue(g, c) - c.req) / 6)) * (c.rep > 84 ? 0.55 : 1) * (c.nat === 'ESP' ? 1.6 : 1),
+    w: (1 / (1 + Math.abs(scoutedValue(g, c) - teamAvgAt(c, g.world.year)) / 6)) *
+       (clubRepAt(c, g.world.year) > 84 ? 0.6 : 1) * (c.nat === 'ESP' ? 1.6 : 1),
     c,
+  }));
+  const out = [];
+  for (let i = 0; i < count && scored.length; i++) {
+    const pk = g.rng.weighted(scored);
+    if (!pk) break;
+    out.push(pk.c); scored.splice(scored.indexOf(pk), 1);
+  }
+  return out;
+}
+
+/** 스페인과 인접·근접한 리그 (임대는 되도록 가까운 곳으로) */
+const NEIGHBOUR = { ESP: ['ESP', 'POR', 'FRA', 'ITA'], POR: ['POR', 'ESP'], FRA: ['FRA', 'ESP', 'BEL', 'ITA'] };
+
+/**
+ * 임대 가능 여부 — 세 조건을 모두 만족해야 한다.
+ *   ① 소속팀 평균 - 임대팀 평균 >= 10
+ *   ② |주인공 능력 - 소속팀 평균| >= 10  (팀 수준에 못 미침)
+ *   ③ 나이 <= 30
+ */
+export function loanTargets(g, count = 2) {
+  const p = g.player;
+  const age = ageOf(g);
+  if (!p.club || p.loanFrom || age > 30) return [];              // 조건 ③
+  const myAvg = teamAvgAt(p.club, g.world.year);
+  if (Math.abs(p.ovr - myAvg) < 10) return [];                   // 조건 ②
+  const near = NEIGHBOUR[p.club.nat] || [p.club.nat];
+  const cand = CLUBS.filter((c) => {
+    if (c.youth || c.id === p.club.id || !clubExists(c, g.world.year)) return false;
+    if (!near.includes(c.nat)) return false;                      // 인접국/자국 우선
+    const avg = teamAvgAt(c, g.world.year);
+    if (myAvg - avg < 10) return false;                           // 조건 ①
+    if (p.ovr < avg - 12) return false;                           // 임대처에서도 뛸 수 있어야 한다
+    return true;
+  });
+  if (!cand.length) return [];
+  // 자국을 우선하고, 내 능력에 가장 맞는 팀을 뽑는다
+  const scored = cand.map((c) => ({
+    w: (c.nat === p.club.nat ? 2.2 : 1) / (1 + Math.abs(p.ovr - teamAvgAt(c, g.world.year)) / 5), c,
   }));
   const out = [];
   for (let i = 0; i < count && scored.length; i++) {
@@ -863,13 +1214,11 @@ function offerChoices(g, offers, { loan = false } = {}) {
   return offers.map((c) => {
     const cur = g.player.club;
     const up = cur ? c.rep > cur.rep + 6 : true;
-    const chance = clamp(g.player.ovr - c.req + 50, 0, 100);
+    const fit = fitLabel(g, c);
     return {
       t: `${c.name} — ${c.league} (${DIV_LABEL[c.div]})${loan ? ' [임대]' : ''}`,
-      meta: `주전 가능성 ${stars(chance)} · 예상 연봉 ${fmtMoney(salaryFor(c, g.player.ovr, g.world.year, g.player.reputation))} · 클럽 명성 ${c.rep}`,
-      risk: chance < 35 ? 'HIGH' : chance < 60 ? 'MID' : 'SAFE',
-      parent: c.div === 1 && c.rep >= 75 ? 2 : c.div === 1 ? 1 : c.div === 3 ? -1 : 0,
-      injury: 1,
+      meta: `팀 평균 능력 ${fit.avg} · 내 능력 ${ability(g)} → ${fit.label} · 예상 연봉 ${fmtMoney(salaryFor(c, g.player.ovr, g.world.year, g.player.reputation))}`,
+      fit,
       tags: up ? ['ambition', 'risk'] : ['safe'],
       fx: (gg) => {
         const from = gg.player.club;
@@ -1060,6 +1409,128 @@ ev({
 });
 
 ev({
+  id: 'father_joblss', once: true,
+  when: (g) => g.player.active && A(g) >= 18 && A(g) <= 26 && g.world.phase === 'SUMMER',
+  w: (g) => (g.world.year >= 2008 && g.world.year <= 2013 ? 260 : 70),
+  body: (g) => {
+    const f = g.npcs.father, m = g.npcs.mother;
+    const age = f.age1990 + (g.world.year - 1990);
+    const mortgage = 620 + g.rng.int(0, 180);
+    g.flags._mortgage = mortgage;
+    const crisis = g.world.year >= 2008 && g.world.year <= 2013;
+    return `${g.world.year}년 여름.${crisis ? ' 스페인 실업률이 20%를 넘었다. 크레인이 멈춘 도시에서 일자리가 사라지고 있다.' : ''}\n\n` +
+      `아버지 ${f.name}이 일하던 곳이 문을 닫았다. ${age}세, ${f.job}. 이 나이에 다음 자리는 없다.\n` +
+      `아버지는 그 얘기를 한 달 뒤에 했다. 그동안 매일 아침 같은 시간에 집을 나갔다고 했다.\n` +
+      `어머니 ${m.name}은 ${m.job} 일을 야간까지 늘렸다.\n\n` +
+      `집 대출이 남아 있다. 월 €${mortgage}.\n\n` +
+      `나는 지금 ${g.player.club ? g.player.club.name : '무소속'}에서 연봉 ${fmtMoney(g.player.econ.wageYear)}을 받는다.\n` +
+      `세후로 나누면 이 집 생활비의 절반쯤 된다. 만 ${A(g)}세에 처음으로, 내 계약이 가족의 재무 계획에 들어갔다.\n\n` +
+      `식탁에서 아무도 그 얘기를 먼저 꺼내지 않는다. 그게 이 집의 방식이다.\n` +
+      `나는 훈련이 끝나고 차 안에서 계산기를 두 번 두드렸다.`;
+    },
+  choices: (g) => [
+    { t: '내 연봉으로 집 대출을 넘겨받는다.',
+      meta: `부채 ${fmtMoney(g.flags._mortgage * 12 * 8)} 이전 (은행 이자 9%) · 자산 축적 대폭 감소 · 가족 관계 최상`,
+      tags: ['family'],
+      fx: (gg) => {
+        gg.econDebtNote = true;
+        gg.player.econ.debt += gg.flags._mortgage * 12 * 8;
+        gg.player.econ.debtRate = 0.09;
+        gg.npcs.father.trust = 98; gg.player.stress += 10;
+        shiftReaction(gg, 1, '가족의 대출을 넘겨받음');
+        remember(gg, 'took_mortgage', `${gg.world.year}년, 아버지의 집 대출을 내 이름으로 넘겼다.`, 0.9);
+      },
+      out: () => '서류에 서명하는 데 20분이 걸렸다. 아버지는 그 자리에 오지 않았다.\n집을 지켰다. 대신 앞으로 몇 년간 내 통장은 내 것이 아니다.' },
+    { t: '돈이 되는 이적을 우선한다.',
+      meta: '다음 이적시장에서 연봉 높은 오퍼를 우선 수락 · 축구적 성장 리스크',
+      tags: ['ambition'],
+      fx: (gg) => { gg.flags.chaseMoney = true; gg.player.stress += 6; remember(gg, 'chase_money', `${gg.world.year}년, 가계 때문에 돈을 따라가기로 했다.`, 0.75); },
+      out: () => '에이전트에게 전화했다. "연봉 제일 높은 데로 보내주세요."\n그 통화 이후, 내 커리어의 기준이 하나 바뀌었다.' },
+    { t: '매달 생활비를 보내되 커리어는 그대로 간다.',
+      meta: `자산 축적 −30% · 스트레스 + · 부채는 생기지 않는다`,
+      tags: ['safe'],
+      fx: (gg) => { gg.flags.sendsMoney = true; gg.player.stress += 8; gg.player.econ.household = clamp(gg.player.econ.household + 8, 0, 100); },
+      out: () => '매달 정해진 날에 송금한다. 아버지는 한 번도 고맙다고 하지 않았고, 나는 그걸 이해했다.' },
+  ],
+});
+
+ev({
+  id: 'sibling_bail', once: true,
+  when: (g) => g.player.active && A(g) >= 19 && A(g) <= 30 && g.npcs.sibling.risk > 45,
+  w: (g) => 40 + (g.npcs.sibling.risk - 45) * 3,
+  body: (g) => {
+    const sib = g.npcs.sibling;
+    const bail = 9000 + g.rng.int(0, 8) * 1000;
+    g.flags._bail = bail;
+    return `${g.world.year}년 1월. 겨울 이적시장이 열린 주에 전화가 왔다.\n\n` +
+      `새벽 두 시였다. 어머니 목소리가 아니었다. 경찰서 통역이었다.\n` +
+      `형 ${sib.name}이 산츠 역 뒤편에서 붙잡혔다. 소지 혐의. 판매 목적이 붙으면 형량이 달라진다고 했다.\n` +
+      `보석금 ${fmtMoney(bail)}. 사흘 안에.\n\n` +
+      `이 동네에서 형의 이름은 몇 년 전부터 다르게 불렸다. 축구를 그만둔 뒤 형은 나보다 훨씬 빠르게 어른이 됐고,\n` +
+      `어떤 방식으로 돈을 벌었는지 가족 모두가 알면서 아무도 묻지 않았다.\n` +
+      `나는 그 돈으로 산 축구화를 두 번 신었다.\n\n` +
+      `지금 통장에 ${fmtMoney(g.player.econ.assets)}이 있다.\n` +
+      `어머니는 울지 않았다. 그게 더 견디기 어려웠다.\n` +
+      `전화를 끊고 훈련장에 나갔다. 그날 슈팅이 하나도 안 들어갔다.`;
+  },
+  choices: (g) => [
+    { t: '사채를 써서 보석금을 전액 낸다.',
+      meta: `부채 ${fmtMoney(g.flags._bail)} (연이자 34%) · 스트레스 ++ · 형 관계 회복`,
+      tags: ['family', 'risk'],
+      fx: (gg) => {
+        gg.player.econ.debt += gg.flags._bail; gg.player.econ.debtRate = 0.34;
+        gg.player.stress += 18; gg.npcs.sibling.helped += 1; gg.npcs.sibling.risk -= 18;
+        remember(gg, 'bail_paid', `${gg.world.year}년, 형의 보석금을 사채로 냈다.`, 0.9);
+      },
+      out: () => '형은 사흘 뒤에 나왔다. 아무 말도 하지 않고 내 어깨를 한 번 쳤다.\n이자 34%. 이 숫자가 앞으로 몇 년간 내 이적 협상을 지배한다.' },
+    { t: '통장을 비우고 나머지는 구단에 가불을 요청한다.',
+      meta: '자산 소진 · 구단 신뢰 −8 · 감독이 사정을 알게 된다',
+      tags: ['safe'],
+      fx: (gg) => {
+        const short = Math.max(0, gg.flags._bail - gg.player.econ.assets);
+        gg.player.econ.assets = Math.max(0, gg.player.econ.assets - gg.flags._bail);
+        if (short > 0) { gg.player.econ.debt += short; gg.player.econ.debtRate = 0.0; }
+        gg.npcs.coach.trust -= 8; gg.npcs.sibling.risk -= 12; gg.npcs.sibling.helped += 1;
+        remember(gg, 'bail_club', `${gg.world.year}년, 구단 가불로 형의 보석금을 냈다.`, 0.85);
+      },
+      out: () => '단장실에서 30분을 설명했다. 이자는 없다고 했다.\n다음 주부터 감독이 나를 다르게 봤다. 좋은 쪽인지 나쁜 쪽인지는 아직 모른다.' },
+    { t: '내지 않는다.',
+      meta: '부채 0 · 형 관계 파탄 · 스트레스 +++ · 30대 이벤트 분기 결정',
+      tags: [],
+      fx: (gg) => {
+        gg.player.stress += 26; gg.npcs.sibling.risk += 14; gg.npcs.sibling.state = 'INCIDENT';
+        gg.flags.abandonedSibling = true;
+        remember(gg, 'bail_refused', `${gg.world.year}년, 형의 보석금을 내지 않았다.`, 0.95);
+      },
+      out: () => '전화를 끊고 다시 걸지 않았다.\n그해 여름 어머니 집에 가지 않았다. 이 결정은 십 년 뒤에 다시 돌아온다.' },
+  ],
+});
+
+ev({
+  id: 'loan_shark',
+  when: (g) => g.player.active && g.player.econ.debt > 20000 && g.player.econ.debtRate > 0.2,
+  once: true, w: () => 300,
+  body: (g) => `훈련장 주차장에 낯선 차가 서 있었다.\n\n` +
+    `두 사람이 내려서 내 이름을 정확히 불렀다. 소속팀도, 다음 원정 일정도 알고 있었다.\n` +
+    `현재 부채 ${fmtMoney(g.player.econ.debt)}. 연이자 34%는 원금을 2년마다 두 배로 만든다.\n\n` +
+    `그들은 위협하지 않았다. 오히려 정중했다. 그게 더 무서웠다.\n` +
+    `"경기 잘 보고 있습니다. 다음 달까지만요."\n\n` +
+    `구단에 알리면 계약에 도덕 조항이 걸린다. 언론이 알면 이적 시장에서 값이 떨어진다.\n` +
+    `혼자 해결해야 한다는 것만 확실하다.`,
+  choices: () => [
+    { t: '구단에 알리고 저리 대출로 전환한다.', meta: '이자 34% → 9% · 평판 −5 · 감독 신뢰 −6', tags: ['safe'],
+      fx: (gg) => { gg.player.econ.debtRate = 0.09; gg.player.reputation -= 5; gg.npcs.coach.trust -= 6; gg.player.stress -= 10; },
+      out: () => '단장이 은행을 연결해줬다. 대신 그 얘기가 라커룸에 돌았다.' },
+    { t: '이적으로 계약금을 만들어 한 번에 정리한다.', meta: '다음 이적에서 연봉보다 계약금 우선 · 축구적 후퇴 가능', tags: ['risk'],
+      fx: (gg) => { gg.flags.chaseMoney = true; gg.player.stress += 8; },
+      out: () => '에이전트에게 상황을 전부 말했다. "그럼 조건은 제가 정합니다."' },
+    { t: '버틴다. 시즌만 끝나면 갚을 수 있다.', meta: '이자 계속 · 스트레스 +++ · 성장률 패널티', tags: ['pride'],
+      fx: (gg) => { gg.player.stress += 22; },
+      out: () => '버텼다. 그 시즌 내내 밤에 잠들기까지 두 시간이 걸렸다.' },
+  ],
+});
+
+ev({
   id: 'summer_market', when: (g) => g.world.phase === 'SUMMER' && A(g) >= 16 && g.player.active && !(A(g) >= 18 && (!g.player.club || g.player.club.youth)), w: () => 100,
   body: (g) => {
     const p = g.player;
@@ -1078,10 +1549,8 @@ ev({
       list.push({ t: '남는다. 이 팀에서 증명한다.', meta: '감독 신뢰 + · 스트레스 −', risk: 'SAFE', parent: 0, injury: 0, tags: ['loyalty'],
         fx: (gg) => { gg.npcs.coach.trust += 6; gg.player.stress -= 4; gg.player.trait.loyalty += 5; },
         out: () => '떠나는 게 쉬웠을 것이다. 남는 쪽을 골랐다.' });
-      if (g.player.club.div <= 2 && A(g) <= 23) {
-        const t = CLUBS.filter((c) => c.div === clamp(g.player.club.div + 1, 1, 3) && c.nat === 'ESP' && c.id !== g.player.club.id);
-        if (t.length) list.push(...offerChoices(g, [g.rng.pick(t)], { loan: true }));
-      }
+      const lt = loanTargets(g, 2);
+      if (lt.length) list.push(...offerChoices(g, lt, { loan: true }));
     } else if (!offers.length) {
       list.push({ t: '무적 상태로 훈련하며 기다린다.', meta: '축구 의지 − · 스트레스 +', risk: 'HIGH', parent: -1, injury: 0, tags: [],
         fx: (gg) => { gg.player.willToPlay -= 10; gg.player.stress += 10; shiftReaction(gg, -1, '소속팀 없음'); },
@@ -1098,13 +1567,15 @@ ev({
     const benched = last && last.apps < 6;
     const offers = benched ? generateOffers(g, 2) : [];
     g.flags._offers = offers.map((c) => c.id);
+    g.flags._loans = loanTargets(g, 2).map((c) => c.id);
     return `${g.player.club.name} · 전반기 ${last ? `${last.apps}경기 ${last.goals}골` : '기록 없음'}\n감독 신뢰 ${round(g.npcs.coach.trust)}/100\n\n` +
       (benched ? '이 상태로 후반기를 보내면 시즌 하나가 통째로 사라진다.\n에이전트: "6개월 임대로 나가야 해."'
                : '전반기는 나쁘지 않았다. 체력이 떨어지는 시기다.');
   },
   choices: (g) => {
     const offers = (g.flags._offers || []).map(clubById).filter(Boolean);
-    const list = offerChoices(g, offers, { loan: true });
+    const loans = (g.flags._loans || []).map(clubById).filter(Boolean);
+    const list = [...offerChoices(g, offers), ...offerChoices(g, loans, { loan: true })];
     list.push({ t: '남아서 후반기 경쟁을 정면으로 한다.', meta: '스트레스 + · 감독 신뢰 +', risk: 'MID', parent: 0, injury: 1, tags: ['pride'],
       fx: (gg) => { gg.player.stress += 10; gg.npcs.coach.trust += 4; },
       out: () => '훈련장에서 가장 먼저 나오고 가장 늦게 들어갔다.' });
@@ -1112,6 +1583,49 @@ ev({
       fx: (gg) => { gg.player.fitness = clamp(gg.player.fitness + 12, 0, 100); gg.player.hidden.injuryProne -= 5; gg.player.form -= 4; },
       out: () => '2월에 몸이 가벼웠다. 3월에 그게 결과로 나왔다.' });
     return list;
+  },
+});
+
+ev({
+  id: 'promo_relegation',
+  when: (g) => g.world.phase === 'SUMMER' && g.player.active && g.player.club && (g.flags.justPromoted || g.flags.justRelegated),
+  w: () => 4000,
+  body: (g) => {
+    const up = !!g.flags.justPromoted;
+    const c = g.player.club;
+    const avg = teamAvgAt(c, g.world.year);
+    if (up) {
+      return `승격했다.\n\n마지막 라운드가 끝나고 그라운드에 사람들이 넘어 들어왔다. 누군가 내 유니폼을 벗겨 갔고,\n` +
+        `나는 상의 없이 30분 동안 관중석 쪽을 보며 서 있었다. 3부에서 2부로, 혹은 2부에서 1부로.\n` +
+        `이 클럽이 몇 년을 기다린 승격인지 라커룸의 나이 든 선수들이 울면서 말해줬다.\n\n` +
+        `문제는 다음 시즌이다. ${c.name}은 이제 ${DIV_LABEL[c.div]}이고, 팀 평균 능력은 ${avg}로 다시 계산된다.\n` +
+        `내 능력은 ${ability(g)}다. 승격한 팀은 여름에 반드시 선수를 사 온다. 그 선수가 내 자리로 온다.\n\n` +
+        `에이전트는 두 가지를 말했다. 하나는 여기서 버티면 1부 무대를 밟는다는 것.\n` +
+        `다른 하나는, 버티지 못하면 반년 뒤 임대 명단에 올라간다는 것.`;
+    }
+    return `강등됐다.\n\n원정 라커룸에서 결과를 들었다. 아무도 소리를 지르지 않았다. 그게 더 이상했다.\n` +
+      `${c.name}은 다음 시즌 ${DIV_LABEL[c.div]}에서 시작한다. 예산이 절반으로 줄고, 주력 선수는 전부 팔린다.\n` +
+      `구단은 내 연봉도 재조정하겠다고 통보했다.\n\n` +
+      `팀 평균 능력은 ${avg}로 내려갔다. 내 능력은 ${ability(g)}다.\n` +
+      `이 리그에서는 내가 가장 잘하는 선수 중 하나가 된다. 매주 90분을 뛸 수 있다.\n` +
+      `대신 아무도 보지 않는 곳에서 뛴다는 뜻이기도 하다. 스카우트는 강등된 팀의 경기를 보지 않는다.\n\n` +
+      `스물 몇 살의 한 시즌은 짧지 않다. 여기서 두 시즌을 보내면 그 뒤는 없다.`;
+  },
+  choices: (g) => {
+    const up = !!g.flags.justPromoted;
+    g.flags.justPromoted = null; g.flags.justRelegated = null;
+    const out = [
+      { t: up ? '남는다. 이 팀으로 1부를 밟는다.' : '남는다. 이 팀에서 다시 올라간다.',
+        meta: up ? '주전 경쟁 · 감독 신뢰 +' : '확실한 주전 · 노출 하락',
+        tags: ['loyalty'],
+        fx: (gg) => { gg.npcs.coach.trust += 10; gg.player.stress += up ? 8 : -6; gg.player.trait.loyalty += 6; },
+        out: () => up ? '유니폼을 그대로 입었다. 프리시즌에 영입된 선수가 내 포지션이었다.'
+                      : '남았다. 이 리그에서 나는 가장 좋은 선수다. 그게 위로가 되지는 않는다.' },
+      { t: '이적을 요청한다.', meta: '여름 시장의 오퍼로 이동', tags: ['ambition'],
+        fx: (gg) => { gg.npcs.coach.trust -= 12; gg.flags.wantsOut = true; },
+        out: () => '구단은 화를 냈지만 막지는 않았다.' },
+    ];
+    return out;
   },
 });
 
@@ -1620,11 +2134,12 @@ export function classify(g) {
     return 'NP_NORMAL';
   }
   // 프로 6티어
-  if (div === 1 && rep >= 90 && peakRep > 82 && p.career.caps >= 40) return 'T1';
-  if (div === 1 && rep >= 82 && peakRep > 70) return 'T2';
-  if (div === 1 && rep >= 68 && apps > 180) return 'T3';
-  if (div === 1 && apps > 60) return 'T4';
-  if (apps > 120) return 'T5';
+  // T1은 발롱도르로 잠근다 — 난이도를 낮춰도 GOAT가 흔해지지 않게
+  if (p.awards.ballonDor >= 1) return 'T1';
+  if (div === 1 && rep >= 80 && peakRep > 66 && apps > 260) return 'T2';   // 빅클럽 주축
+  if (div === 1 && apps > 420) return 'T3';                                  // 1부 정착
+  if (div === 1 && apps > 40) return 'T4';                                   // 1부를 밟았으나 정착 실패
+  if (apps > 200) return 'T5';
   return 'T6';
 }
 
@@ -1658,6 +2173,10 @@ export function finish(g) {
       caps: p.career.caps, ntGoals: p.career.ntGoals,
       ntTeam: p.ntTeam ? NT_NAME[p.ntTeam] : '없음',
       trophies: p.career.trophies,
+      awards: p.awards,
+      injuries: p.career.injuries || [],
+      debt: p.econ.debt > 0 ? fmtMoney(p.econ.debt) : '없음',
+      totalEarned: fmtMoney(p.econ.totalEarned),
       assets: fmtMoney(p.econ.assets),
       peakSalary: fmtMoney(Math.max(0, ...p.career.seasons.map((s) => s.salary || 0))),
       peakOvr: round(p.peakOvr), finalOvr: round(p.ovr),
@@ -1709,6 +2228,7 @@ export function dashboard(g) {
   const abil = ability(g);
   const r = REACTIONS[g.world.reaction];
   return {
+    backstory: g.backstory || '',
     period: periodLabel(g), age: ageOf(g), name: p.name,
     nationality: p.immigrantBg ? `스페인 (${p.immigrantBg} 배경)` : '스페인',
     position: POSITIONS[p.position].label,
@@ -1727,7 +2247,17 @@ export function dashboard(g) {
       father: `${g.npcs.father.name} · ${g.npcs.father.job}`,
       mother: `${g.npcs.mother.name} · ${g.npcs.mother.job}`,
     },
-    econ: { wage: p.econ.wageYear ? fmtMoney(p.econ.wageYear) : '-', assets: fmtMoney(p.econ.assets) },
+    econ: {
+      wage: p.econ.wageYear ? fmtMoney(p.econ.wageYear) : '-',
+      assets: fmtMoney(p.econ.assets),
+      debt: p.econ.debt > 0 ? `${fmtMoney(p.econ.debt)} (이자 ${Math.round(p.econ.debtRate * 100)}%)` : '없음',
+      hasDebt: p.econ.debt > 0,
+    },
+    teamAvg: p.club && !p.club.youth ? teamAvgAt(p.club, g.world.year) : null,
+    fit: p.club && !p.club.youth ? fitLabel(g, p.club).label : null,
+    awards: p.awards,
+    sibling: g.npcs.sibling ? `${g.npcs.sibling.name} — ${{ STABLE: '안정', DRIFT: '이탈', SLUM: '슬럼', INCIDENT: '사건 이후', RECOVER: '회복', PRISON: '수감', DEAD: '사망' }[g.npcs.sibling.state]}` : '-',
+    injuries: (p.career.injuries || []).slice(-3),
     coach: round(g.npcs.coach.trust),
     contract: p.contractUntil ? `${p.contractUntil}년까지` : '-',
     career: { apps: p.career.apps, goals: p.career.goals, assists: p.career.assists, caps: p.career.caps, reputation: round(p.reputation) },

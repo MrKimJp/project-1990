@@ -108,6 +108,12 @@ table.career tr:hover td{background:var(--panel2)}
 .blk.history{color:var(--gold);font-weight:600;font-size:12.5px;font-family:var(--mono);
   border-left:2px solid var(--gold);padding:7px 12px;background:#1a1608;white-space:pre-line}
 .blk.header{font-family:var(--display);font-size:22px;font-weight:700;letter-spacing:.03em;text-transform:uppercase}
+.blk.backstory{font-size:14.5px;line-height:1.85;white-space:pre-line;max-width:74ch;
+  border-left:2px solid var(--gold);padding:4px 0 4px 18px;color:var(--tx)}
+.blk.ucl{color:var(--sky);font-family:var(--mono);font-size:12px}
+.blk.award{color:var(--gold);font-weight:700;font-size:14px;background:#1a1608;
+  border-left:2px solid var(--gold);padding:8px 13px}
+.blk.debt{color:var(--bad);font-family:var(--mono);font-size:11.5px}
 .blk.birth{font-family:var(--mono);font-size:11.5px;background:var(--navy2);border:1px solid var(--rule);
   padding:11px 13px;white-space:pre-line;color:var(--tx2)}
 .blk.system{color:var(--tx2);font-size:13.5px;white-space:pre-wrap}
