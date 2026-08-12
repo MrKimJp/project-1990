@@ -738,7 +738,7 @@ function newGame(opts = {}) {
         name: bg ? `${rng.pick(bg.first)} ${surname}` : `${rng.pick(SPANISH_FIRST)} ${surname}`,
         age1990: rng.int(2, 6),
         state: 'STABLE',      // STABLE → DRIFT → SLUM → INCIDENT → (RECOVER|PRISON|DEAD)
-        risk: clamp(round(rng.norm(env.safety < 30 ? 58 : 32, 16)), 5, 92),
+        risk: clamp(round(rng.norm(env.safety < 30 ? 42 : 24, 14)), 3, 88),
         helped: 0,
       },
     },
@@ -1044,11 +1044,27 @@ function matchesInPeriod(g) {
   return round(base * periodYears(g));
 }
 
-function leagueFinish(g, club) {
-  const lg = leagueOf(club.leagueId);
+/** 승격·강등으로 소속 부가 바뀌면 그 부의 리그를 기준으로 순위를 매긴다 */
+function leagueForDiv(club) {
+  const same = LEAGUES.find((l) => l.nat === club.nat && l.div === club.div);
+  return same || leagueOf(club.leagueId);
+}
+
+/**
+ * 리그 순위. 명성 백분위를 기준선으로 두되,
+ *   ① 하위 리그일수록 전력 차가 작아 순위 변동이 크다 (parity)
+ *   ② 주인공이 팀 평균을 크게 웃돌면 팀 순위를 실제로 끌어올린다
+ * 이 두 항이 없으면 중위권 3부 클럽은 22팀 리그에서 영원히 승격하지 못한다.
+ */
+function leagueFinish(g, club, share = 1) {
+  const lg = leagueForDiv(club);
   const size = lg ? lg.clubs.length : 20;
   const better = (lg ? lg.clubs : []).filter(([, r]) => r > club.rep).length;
-  return { finish: clamp(round(better + 1 + g.rng.norm(0, size * 0.13)), 1, size), size };
+  const expected = clamp(better + 1, 1, size);
+  const parity = club.div === 1 ? 0.15 : club.div === 2 ? 0.22 : 0.30;
+  // 벤치에 앉은 선수는 팀 순위를 끌어올리지도, 끌어내리지도 않는다
+  const lift = clamp((g.player.ovr - teamAvgAt(club, g.world.year)) / 2.6, -3, 7) * clamp(share, 0, 1);
+  return { finish: clamp(round(expected - lift + g.rng.norm(0, size * parity)), 1, size), size };
 }
 
 /**
@@ -1099,6 +1115,15 @@ function rollInjury(g, age) {
     }
   }
   return { type: t, weeks, ovrLoss, severe };
+}
+
+/** 부가 바뀌면 리그 이름·노출도도 그 부에 맞게 바꾼다 */
+function relabelLeague(g, club) {
+  const lg = LEAGUES.find((l) => l.nat === club.nat && l.div === club.div);
+  if (!lg) return;
+  club.league = lg.name;
+  club.leagueId = lg.id;
+  club.expo = clamp(round(clubRepAt(club, g.world.year) * (club.div === 1 ? 0.98 : club.div === 2 ? 0.62 : 0.34)), 6, 99);
 }
 
 function simulatePeriod(g) {
@@ -1177,17 +1202,17 @@ function simulatePeriod(g) {
   let finishRec = null, uclRec = null;
   const doFinish = g.world.phase === 'SUMMER' || cadenceOf(age) === 'YEAR';
   if (seniorClub && doFinish && apps >= 5) {
-    const { finish, size } = leagueFinish(g, club);
+    const { finish, size } = leagueFinish(g, club, share);
     finishRec = { finish, size };
     if (finish === 1) {
       ach.push(club.div === 1 ? `${club.league} 우승` : `${club.league} 우승 · 승격`);
       p.career.trophies.push(`${g.world.year} ${club.league} 우승`);
-      if (club.div > 1) { club.div -= 1; club.req += 6; }
+      if (club.div > 1) { club.div -= 1; club.req += 6; relabelLeague(g, club); }
       shiftReaction(g, 1, '리그 우승');
     } else if (club.div > 1 && finish <= 2) {
-      ach.push('승격'); club.div -= 1; club.req += 6; g.flags.justPromoted = club.name;
-    } else if (finish >= size - 2) {
-      ach.push('강등'); if (club.div < 3) { club.div += 1; club.req -= 6; }
+      ach.push('승격'); club.div -= 1; club.req += 6; relabelLeague(g, club); g.flags.justPromoted = club.name;
+    } else if (finish >= size - 1) {
+      ach.push('강등'); if (club.div < 3) { club.div += 1; club.req -= 6; relabelLeague(g, club); }
       g.flags.justRelegated = club.name;
       shiftReaction(g, -1, '팀 강등');
     } else if (finish <= 4 && club.div === 1) {
@@ -1304,7 +1329,7 @@ function ballonDorCheck(g, club, ucl, rating, goals, apps) {
   if (g.flags.wcHero) score += 12;
   score += g.rng.norm(0, 9);
 
-  if (score > 62) {
+  if (score > 70) {
     p.awards.ballonDor += 1;
     p.career.trophies.push(`${g.world.year} 발롱도르 수상`);
     remember(g, 'ballon', `${g.world.year}년 발롱도르를 받았다.`, 1.0);
@@ -1520,7 +1545,7 @@ function refusalChance(g, target) {
   const last = p.career.seasons[p.career.seasons.length - 1];
   if (last && last.apps < 6) x -= 0.15;              // 안 뛰는 선수는 붙잡지 않는다
   if (marketClimate(g).domestic) x -= 0.12;          // 자금난이면 오히려 팔고 싶다
-  if (g.flags.wantsOut) x -= 0.10;
+  if (g.flags.wantsOut && g.world.year - g.flags.wantsOut <= 1) x -= 0.14;
   if (target && isBigClub(g, target)) x -= 0.05;     // 빅클럽 오퍼는 거절하기 어렵다
   return clamp(x, 0.10, 0.70);
 }
@@ -1545,7 +1570,7 @@ function joinClub(g, club, opts = {}) {
 const stars = (v) => '★'.repeat(clamp(round((v / 100) * 5), 1, 5)) + '☆'.repeat(5 - clamp(round((v / 100) * 5), 1, 5));
 
 /** 이적 오퍼 → 선택지 (배지 정보 포함) */
-function offerChoices(g, offers, { loan = false } = {}) {
+function offerChoices(g, offers, { loan = false, agreed = false } = {}) {
   return offers.map((c) => {
     const cur = g.player.club;
     const up = cur ? c.rep > cur.rep + 6 : true;
@@ -1558,7 +1583,7 @@ function offerChoices(g, offers, { loan = false } = {}) {
       fx: (gg) => {
         const from = gg.player.club;
         // 구단이 거부할 수 있다
-        if (!loan && gg.rng.chance(refusalChance(gg, c))) {
+        if (!loan && !agreed && gg.rng.chance(refusalChance(gg, c))) {
           gg.flags.transferBlocked = { name: c.name, id: c.id };
           gg.player.stress += 12;
           return;
@@ -1817,8 +1842,8 @@ ev({
 
 ev({
   id: 'sibling_bail', once: true,
-  when: (g) => g.player.active && A(g) >= 19 && A(g) <= 30 && g.npcs.sibling.risk > 45,
-  w: (g) => 40 + (g.npcs.sibling.risk - 45) * 3,
+  when: (g) => g.player.active && A(g) >= 19 && A(g) <= 30 && g.npcs.sibling.risk > 50,
+  w: (g) => 16 + (g.npcs.sibling.risk - 50) * 1.8,
   body: (g) => {
     const sib = g.npcs.sibling;
     const bail = 9000 + g.rng.int(0, 8) * 1000;
@@ -1922,12 +1947,111 @@ ev({
         out: () => '떠나는 게 쉬웠을 것이다. 남는 쪽을 골랐다.' });
       const lt = loanTargets(g, 2);
       if (lt.length) list.push(...offerChoices(g, lt, { loan: true }));
+      // 이적 요청 — 구단이 그 자리에서 답한다
+      list.push({ t: '"이적 요청하자. 여기서는 더 안 늘어."',
+        meta: `구단 반응 즉시 확인 (예상 거부율 ${Math.round(refusalChance(g, null) * 100)}%) · 감독 신뢰 −12`,
+        tags: ['ambition'],
+        fx: (gg) => { gg.npcs.coach.trust -= 12; gg.flags.requestPending = true; },
+        out: () => '단장실 문을 두드렸다.' });
     } else if (!offers.length) {
       list.push({ t: '"일단 몸이나 만들면서 기다리자. 전화는 오겠지."', meta: '축구 의지 − · 스트레스 +', risk: 'HIGH', parent: -1, injury: 0, tags: [],
         fx: (gg) => { gg.player.willToPlay -= 10; gg.player.stress += 10; shiftReaction(gg, -1, '소속팀 없음'); },
         out: () => '전화는 오지 않았다. 그래도 다음 주에도 나갔다.' });
     }
     return list;
+  },
+});
+
+ev({
+  id: 'transfer_request', when: (g) => !!g.flags.requestPending && g.player.active && g.player.club, w: () => 9999,
+  body: (g) => {
+    const p = g.player;
+    const club = p.club;
+    const myAvg = teamAvgAt(club, g.world.year);
+    const chance = refusalChance(g, null);
+    // 구단의 답은 여기서 결정된다
+    const accepted = !g.rng.chance(chance);
+    g.flags._reqAccepted = accepted;
+    const offers = accepted ? generateOffers(g, 5) : [];
+    g.flags._reqOffers = offers.map((c) => c.id);
+    if (!accepted) {
+      const alt = generateOffers(g, 1);
+      g.flags._reqTarget = alt.length ? { name: alt[0].name, id: alt[0].id } : null;
+    }
+
+    const head = `단장실에 들어갔다. 이적 요청을 정식으로 꺼냈다.\n\n` +
+      `${club.name} · 팀 평균 ${myAvg} · 내 능력 ${ability(g)} · 감독 신뢰 ${round(g.npcs.coach.trust)}/100\n` +
+      `계약 만료 ${p.contractUntil}년\n\n`;
+
+    if (accepted) {
+      return head +
+        `단장은 오래 생각하지 않았다.\n` +
+        `"막지 않겠다. 조건이 맞는 곳이 오면 보내주지."\n\n` +
+        (offers.length
+          ? `에이전트가 그날 저녁에 명단을 들고 왔다. 실제로 움직일 수 있는 곳은 아래가 전부다.`
+          : `문제는 그 다음이었다. 허락은 받았는데, 이번 시장에 나를 원하는 구단이 없다.\n` +
+            `에이전트는 "겨울까지 기다려보자"고 했다. 그 말을 몇 번째 듣는지 모르겠다.`);
+    }
+    return head +
+      `단장이 서류를 덮었다.\n` +
+      `"지금은 팀 계획의 일부다. 이번 여름에는 못 보낸다."\n\n` +
+      `${g.npcs.coach.trust > 62 ? '감독이 나를 붙잡는 쪽이었다. 신뢰가 높은 게 이럴 때는 족쇄가 된다.' : '팀 사정이지 내 실력 문제는 아니라고 했다. 위로가 되지는 않는다.'}\n` +
+      `요청했다는 사실만 라커룸에 남았다. 이 상태로 시즌을 시작하면 어떻게 되는지는 나도 안다.`;
+  },
+  choices: (g) => {
+    g.flags.requestPending = false;
+    if (g.flags._reqAccepted) {
+      const offers = (g.flags._reqOffers || []).map(clubById).filter(Boolean);
+      const list = offerChoices(g, offers, { agreed: true });   // 구단이 이미 허락했다
+      list.push({ t: '"조건이 안 맞네. 한 시즌 더 남자."', meta: '잔류 · 감독 신뢰 −6 · 다음 여름 거부율 하락',
+        tags: ['loyalty'],
+        fx: (gg) => { gg.npcs.coach.trust -= 6; gg.flags.wantsOut = gg.world.year; },
+        out: () => '허락은 받았지만 갈 곳이 마땅치 않았다. 남았다. 단장은 다음 여름을 약속했다.' });
+      return list;
+    }
+    // 거부 — 태업할지 받아들일지
+    const tgt = g.flags._reqTarget;
+    return [
+      { t: '"훈련을 놓자. 데리고 있는 게 손해라고 느껴야 풀어줄 거야."',
+        meta: '결과 3분기: 징계(출전 급감) / 이적 허가 / 상승 조건 재계약',
+        tags: ['risk', 'pride'],
+        fx: (gg) => {
+          const lev = gg.player.reputation + (gg.player.ovr - teamAvgAt(gg.player.club, gg.world.year)) * 2;
+          const r = gg.rng.f();
+          if (r < 0.34) {
+            gg.flags.holdoutResult = 'DISCIPLINE';
+            gg.npcs.coach.trust = clamp(gg.npcs.coach.trust - 34, 5, 95);
+            gg.player.form = clamp(gg.player.form - 22, 10, 98);
+            gg.player.reputation = clamp(gg.player.reputation - 8, 0, 100);
+            gg.player.stress += 20;
+            remember(gg, 'holdout_punished', `${gg.world.year}년, 이적 요청이 거부된 뒤 태업으로 징계를 받았다.`, 0.88);
+          } else if (tgt && r < 0.34 + clamp(0.30 + lev / 400, 0.2, 0.5)) {
+            gg.flags.holdoutResult = 'RELEASED';
+            const target = CLUBS.find((c) => c.id === tgt.id);
+            if (target) joinClub(gg, target, { years: 4, wanted: true });
+            remember(gg, 'holdout_won', `${gg.world.year}년, 태업 끝에 ${tgt.name} 이적을 받아냈다.`, 0.85);
+          } else {
+            gg.flags.holdoutResult = 'RENEW';
+            gg.player.contractUntil = gg.world.year + 4;
+            gg.flags.wageBump = 1.9;
+            gg.npcs.coach.trust = clamp(gg.npcs.coach.trust - 8, 5, 95);
+            remember(gg, 'holdout_renew', `${gg.world.year}년, 태업 끝에 조건을 올려 재계약했다.`, 0.8);
+          }
+        },
+        out: (gg) => ({
+          DISCIPLINE: '2주째 훈련에서 감독이 나를 불러 세웠다. 그날로 1군 명단에서 빠졌다.\n예비 명단에서 시즌을 보냈다. 이 도박은 실패했다.',
+          RELEASED: '한 달 만에 구단이 손을 들었다. "팀 분위기를 해치는 선수는 데리고 있지 않는다."\n원하는 곳으로 갔다. 대신 이 도시에서의 평판은 남았다.',
+          RENEW: '구단이 다른 카드를 냈다. 주급을 두 배 가까이 올린 재계약서였다.\n서명했다. 이적은 못 했지만, 이겼다고 볼 수도 있다.',
+        }[gg.flags.holdoutResult] || '') },
+      { t: '"받아들이자. 프로답게 뛰면 다음 여름엔 안 막겠지."',
+        meta: '감독 신뢰 + · 다음 여름 거부율 하락', tags: ['loyalty', 'discipline'],
+        fx: (gg) => {
+          gg.npcs.coach.trust = clamp(gg.npcs.coach.trust + 14, 5, 95);
+          gg.player.stress = clamp(gg.player.stress - 8, 0, 100);
+          gg.flags.wantsOut = gg.world.year;
+        },
+        out: () => '프로답게 뛰었다. 단장이 시즌 끝에 "다음 여름에는 막지 않겠다"고 했다.\n그 말을 믿을지는 다음 여름에 알게 된다.' },
+    ];
   },
 });
 
@@ -1986,7 +2110,7 @@ ev({
         gg.flags.transferBlocked = null;
         gg.npcs.coach.trust = clamp(gg.npcs.coach.trust + 14, 5, 95);
         gg.player.stress = clamp(gg.player.stress - 8, 0, 100);
-        gg.flags.wantsOut = true;   // 다음 여름 협상에서 유리해진다
+        gg.flags.wantsOut = gg.world.year;   // 다음 여름 협상까지만 유효
       },
       out: () => '프로답게 뛰었다. 단장이 시즌 끝에 "다음 여름에는 막지 않겠다"고 했다.\n그 말을 믿을지는 다음 여름에 알게 된다.' },
   ],
@@ -2054,7 +2178,7 @@ ev({
         out: () => up ? '유니폼을 그대로 입었다. 프리시즌에 영입된 선수가 내 포지션이었다.'
                       : '남았다. 이 리그에서 나는 가장 좋은 선수다. 그게 위로가 되지는 않는다.' },
       { t: '"이적 요청하자. 여기 더 있으면 썩어."', meta: '여름 시장의 오퍼로 이동', tags: ['ambition'],
-        fx: (gg) => { gg.npcs.coach.trust -= 12; gg.flags.wantsOut = true; },
+        fx: (gg) => { gg.npcs.coach.trust -= 12; gg.flags.requestPending = true; },
         out: () => '구단은 화를 냈지만 막지는 않았다.' },
     ];
     return out;
@@ -2452,7 +2576,7 @@ function beginTurn(g) {
   return g;
 }
 
-const CHAIN = ['trial_result', 'youth_offers', 'after_quit'];
+const CHAIN = ['trial_result', 'youth_offers', 'after_quit', 'transfer_request', 'holdout'];
 
 function choose(g, index) {
   if (g.over || !g.pending) return g;
