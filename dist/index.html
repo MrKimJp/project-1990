@@ -1483,6 +1483,85 @@ function ballonDorCheck(g, club, ucl, rating, goals, apps, share, ntRes) {
  * 3부(프리메라 RFEF급) 선수는 어느 대표팀도 뽑지 않는다. 스카우팅 자체가 닿지 않는다.
  * 강팀(스페인·아르헨티나)은 1부 주전만, 중·약체는 2부까지 본다.
  */
+/** 대표팀 평균 OVR — 경쟁 강도(NT_BAR)에서 파생 */
+function ntTeamAvg(nt) {
+  return clamp(round(28 + (NT_BAR[nt] ?? 70) * 0.58), 40, 92);
+}
+
+/**
+ * 포지션별 대표팀 평균. 전체 평균만 보면 "전체는 강한데 내 자리는 비어 있는" 상황을
+ * 표현할 수 없다. 나라·포지션마다 한 번 굴려서 커리어 내내 고정한다.
+ */
+function ntPosAvg(g, nt, pos) {
+  g.world._ntPos = g.world._ntPos || {};
+  const k = `${nt}:${pos}`;
+  if (g.world._ntPos[k] == null) {
+    g.world._ntPos[k] = clamp(round(ntTeamAvg(nt) + g.rng.norm(0, 5.5)), 35, 95);
+  }
+  return g.world._ntPos[k];
+}
+
+/** 포지션 희소성 — 대체 자원이 적은 자리는 기준이 느슨하다 */
+const POS_SCARCITY = { GK: 3, CB: 2, FB: 1.5, CM: 0, AM: 0, WG: 0.5, ST: 1 };
+
+/**
+ * 소집 판정. 절대 OVR이 아니라 "포지션 경쟁자 대비"가 1순위다.
+ * 전체 평균보다 낮아도 그 자리의 경쟁이 약하면 뽑힐 수 있다.
+ */
+function ntCallChance(g) {
+  const p = g.player;
+  const nt = p.ntTeam || p.nationality;
+  const teamAvg = ntTeamAvg(nt);
+  const posAvg = ntPosAvg(g, nt, p.position);
+  const last = p.career.seasons[p.career.seasons.length - 1];
+  const recent = last ? (last.rating - 6.6) * 6 : 0;
+
+  let score =
+    (p.ovr - posAvg) * 0.95 +          // 포지션 경쟁이 가장 중요하다
+    (p.ovr - teamAvg) * 0.35 +         // 전체 수준은 보조
+    (p.form - 55) * 0.06 +
+    (p.reputation - 40) * 0.06 +
+    Math.min(p.career.caps, 40) * 0.05 + // 국제대회 경험
+    recent +
+    (POS_SCARCITY[p.position] ?? 0);
+
+  // 최근 폼 폭발 / 부상 대체 차출 같은 예외
+  if (p.form > 82) score += 3;
+  if (p.injuryWeeks > 0) score -= 12;
+
+  return { chance: clamp(sigmoid(score / 4.2), 0.01, 0.97), teamAvg, posAvg, score };
+}
+
+/** 대표팀 안에서 주인공의 위치 — 서술 분기 */
+function ntRole(gap) {
+  if (gap >= 10) return 'CORE';
+  if (gap >= 5) return 'LEADER';
+  if (gap >= -2) return 'SQUAD';
+  return 'FRINGE';
+}
+const NT_ROLE_TEXT = {
+  CORE: [
+    '내가 이 팀의 중심이야.',
+    '이번 대회에서 무슨 일이 일어나든 내 책임이 크지.',
+    '기자회견에 나가는 것도 나고, 지면 욕먹는 것도 나야.',
+  ],
+  LEADER: [
+    '내가 이 선수들을 이끌어야 해.',
+    '내가 잘하면 이 팀은 충분히 해볼 만하지.',
+    '어린 선수들이 내 쪽을 보고 있는 게 느껴져.',
+  ],
+  SQUAD: [
+    '이렇게 떨리는 건 처음이야.',
+    '나도 이 팀의 한 명일 뿐이지.',
+    '내가 실수하면 어떻게 하지.',
+  ],
+  FRINGE: [
+    '여기 있는 게 아직도 안 믿겨.',
+    '명단에 든 것만으로도 운이 좋았어.',
+    '한 경기라도 뛰면 그걸로 남는 거지.',
+  ],
+};
+
 function ntEligible(g) {
   const p = g.player;
   if (!p.club || p.club.youth) return false;
@@ -1552,7 +1631,7 @@ function nationalTeamCheck(g) {
   g.flags._ntDropped = false;
 
   if (!p.ntTeam) {
-    if (p.ovr + p.reputation * 0.25 > bar - 4 && g.rng.chance(0.55)) {
+    if (g.rng.chance(ntCallChance(g).chance * 0.55)) {
       p.ntTeam = nt; p.career.caps += 1; recordCaps(g, 1, nt);
       pushLog(g, 'nt', `${NT_NAME[nt]} 대표팀 A매치 데뷔.`);
       remember(g, 'nt_debut', `${g.world.year}년 ${NT_NAME[nt]} 대표팀 데뷔`, 0.75);
@@ -1562,7 +1641,7 @@ function nationalTeamCheck(g) {
     }
     return;
   }
-  if (p.ovr + p.reputation * 0.22 > bar - 6) {
+  if (g.rng.chance(ntCallChance(g).chance)) {
     const caps = round(periodYears(g) * g.rng.int(3, 9));
     p.career.caps += caps;
     p.career.ntGoals += round(caps * POSITIONS[p.position].goal * 0.6 * g.rng.f() * 1.6);
@@ -2614,13 +2693,33 @@ ev({
     A(g) >= 20 && A(g) <= 36 && g.player.active && g.player.ntTeam && ntEligible(g),
   w: () => 800,
   body: (g) => {
-    g.flags._wcIn = g.player.ovr + g.player.reputation * 0.3 + g.rng.norm(0, 5) > (NT_BAR[g.player.ntTeam] ?? 70) + 2;
+    const call = ntCallChance(g);
+    g.flags._wcIn = g.rng.chance(call.chance);
+    g.flags._ntGap = round(g.player.ovr - call.teamAvg);
+    g.flags._ntTeamAvg = call.teamAvg;
+    g.flags._ntPosAvg = call.posAvg;
     const club = g.player.club;
-    return g.flags._wcIn
-      ? `${g.world.year} 월드컵 ${NT_NAME[g.player.ntTeam]} 최종 명단이 발표됐다. 이름이 있다.\n\n` +
-        `${club.name}(${club.league}) 소속으로 뽑혔다. 소집 명단에는 나보다 유명한 이름이 스무 개 넘게 있다.`
-      : `${g.world.year} 월드컵 최종 명단이 발표됐다. 이름이 없다.\n\n` +
-        `예비 명단 마지막 줄에 있었다는 건 나중에 알았다.`;
+    const gap = g.flags._ntGap;
+    const teamAvg = g.flags._ntTeamAvg, posAvg = g.flags._ntPosAvg;
+    const stat = `대표팀 평균 ${teamAvg} · ${POSITIONS[g.player.position].label} 평균 ${posAvg} · 내 능력 ${ability(g)}`;
+
+    if (!g.flags._wcIn) {
+      const why = g.player.injuryWeeks > 0 ? '부상이 결정적이었다.'
+        : g.player.ovr < posAvg - 3 ? `내 자리에는 나보다 나은 선수가 이미 있다.`
+        : '마지막 두 자리에서 밀렸다.';
+      return `${g.world.year} 월드컵 ${NT_NAME[g.player.ntTeam]} 최종 명단이 발표됐다. 이름이 없다.\n\n` +
+        `${stat}\n\n${why}\n예비 명단 마지막 줄에 있었다는 건 나중에 알았다.`;
+    }
+    const role = ntRole(gap);
+    const lines = NT_ROLE_TEXT[role].join('\n');
+    const head = {
+      CORE: '팀의 중심으로 뽑혔다. 감독이 첫 인터뷰에서 내 이름을 세 번 말했다.',
+      LEADER: '주축으로 뽑혔다. 라커룸에서 내 자리가 문 쪽이 아니라 안쪽이다.',
+      SQUAD: '명단에 들었다. 스물세 명 중 하나다.',
+      FRINGE: '명단에 들었다. 솔직히 마지막 자리였다.',
+    }[role];
+    return `${g.world.year} 월드컵 ${NT_NAME[g.player.ntTeam]} 최종 명단이 발표됐다. 이름이 있다.\n\n` +
+      `${club.name}(${club.league}) 소속\n${stat}\n\n${head}\n\n${lines}`;
   },
   choices: (g) => {
     if (!g.flags._wcIn) return [{ t: '"TV로 보자. 지금 할 수 있는 게 없어."', meta: '자신감 − · 독기 +', risk: 'SAFE', parent: -1, injury: 0, tags: [],
