@@ -39,7 +39,7 @@ function sec(label) {
   return s;
 }
 
-/* ─────────── 시작 화면 (출생 조건은 전부 랜덤 롤) ─────────── */
+/* ─────────── 시작 화면 (이름·포지션·국적 입력) ─────────── */
 
 function renderStart() {
   const root = $('#app');
@@ -48,50 +48,71 @@ function renderStart() {
 
   const lede = el('div', 'lede');
   lede.innerHTML =
-    '1990년 바르셀로나 출생. <em>만 16세, 프로가 되기 위한 첫 여름부터</em> 시작한다.<br>' +
+    '1990년생 축구 유망주. <em>만 16세, 프로가 되기 위한 첫 여름부터</em> 시작한다.<br>' +
     '0~15세는 플레이하지 않지만 시뮬레이션은 돌아간다 — 그 결과가 <em>배경설정</em>으로 주어진다.<br>' +
-    '<em>매 시즌 이적시장에서 팀을 고르고, 팀 평균 능력과 자신을 비교하고, 부상과 빚을 견디고, 은퇴를 결정한다.</em><br>' +
-    '<span class="muted">28세에 능력이 피크를 찍고 이후 하락한다. 잠재력은 은퇴할 때까지 공개되지 않는다.</span>';
+    '<em>매 시즌 이적시장에서 팀을 고르고, 팀 평균 능력과 자신을 비교하고, 부상을 견디고, 은퇴를 결정한다.</em><br>' +
+    '<span class="muted">모두 능력 50에서 시작한다. 28세에 피크를 찍고 이후 하락하며, 잠재력은 은퇴할 때까지 공개되지 않는다.</span>';
   root.appendChild(lede);
 
-  if (!UI.preview) UI.preview = newGame({ seed: (Math.random() * 2 ** 31) | 0 });
-  const r = rollSummary(UI.preview);
+  UI.form = UI.form || { name: '', position: 'ST', nationality: 'ESP' };
 
   const c = el('div', 'card');
-  c.appendChild(el('h2', null, '출생 조건 (무작위)'));
-  c.appendChild(kv('이름', r.name, 'gold'));
-  c.appendChild(kv('가정환경', r.env));
-  c.appendChild(el('div', 'muted', r.envBlurb));
-  const s1 = sec('가족');
-  s1.appendChild(kv('아버지', r.father));
-  s1.appendChild(kv('어머니', r.mother));
-  s1.appendChild(kv('부모 성향', r.personality, 'gold'));
-  s1.appendChild(el('div', 'muted', r.personalityBlurb));
-  s1.appendChild(kv('축구 반응', r.reaction));
-  s1.appendChild(kv('포지션', r.position));
-  c.appendChild(s1);
+  c.appendChild(el('h2', null, '선수 만들기'));
+
+  const field = (labelText, control) => {
+    const f = el('div', 'field');
+    f.appendChild(el('label', 'flbl', labelText));
+    f.appendChild(control);
+    return f;
+  };
+
+  const nameIn = el('input', 'finput');
+  nameIn.type = 'text'; nameIn.maxLength = 40;
+  nameIn.placeholder = '비워두면 국적에 맞는 이름이 자동 생성됩니다';
+  nameIn.value = UI.form.name;
+  nameIn.oninput = (e) => { UI.form.name = e.target.value; };
+  c.appendChild(field('이름', nameIn));
+
+  const posSel = el('select', 'finput');
+  Object.entries(POSITIONS).forEach(([id, v]) => {
+    const o = el('option', null, v.label); o.value = id;
+    if (id === UI.form.position) o.selected = true;
+    posSel.appendChild(o);
+  });
+  posSel.onchange = (e) => { UI.form.position = e.target.value; };
+  c.appendChild(field('포지션', posSel));
+
+  const natSel = el('select', 'finput');
+  Object.entries(NT_NAME).forEach(([id, label]) => {
+    const o = el('option', null, label); o.value = id;
+    if (id === UI.form.nationality) o.selected = true;
+    natSel.appendChild(o);
+  });
+  natSel.onchange = (e) => { UI.form.nationality = e.target.value; };
+  c.appendChild(field('국적 (대표팀)', natSel));
   root.appendChild(c);
 
   const act = el('div', 'card');
   const row = el('div', 'row');
-  const start = el('button', 'btn primary', '이 인생을 시작한다 →');
-  start.onclick = () => { UI.game = UI.preview; UI.preview = null; UI.screen = 'game'; render(); };
-  const reroll = el('button', 'btn', '다시 굴리기');
-  reroll.onclick = () => { UI.preview = newGame({ seed: (Math.random() * 2 ** 31) | 0 }); render(); };
-  const seedIn = el('input');
+  const start = el('button', 'btn primary', '커리어 시작 →');
+  start.onclick = () => {
+    const t = UI.seedText.trim();
+    UI.game = newGame({
+      name: UI.form.name,
+      position: UI.form.position,
+      nationality: UI.form.nationality,
+      seed: t === '' ? (Math.random() * 2 ** 31) | 0 : hashSeed(t),
+    });
+    UI.screen = 'game'; render();
+  };
+  const seedIn = el('input', 'finput');
   seedIn.type = 'text'; seedIn.placeholder = 'seed (선택)'; seedIn.value = UI.seedText;
   seedIn.oninput = (e) => { UI.seedText = e.target.value; };
-  const apply = el('button', 'btn ghost', 'seed 적용');
-  apply.onclick = () => {
-    const t = UI.seedText.trim();
-    UI.preview = newGame({ seed: t === '' ? (Math.random() * 2 ** 31) | 0 : hashSeed(t) });
-    render();
-  };
   const bt = el('button', 'btn ghost', '엔진 검증 (자동 시뮬)');
   bt.onclick = () => { UI.screen = 'batch'; render(); };
-  [start, reroll, seedIn, apply, bt].forEach((x) => row.appendChild(x));
+  [start, seedIn, bt].forEach((x) => row.appendChild(x));
   act.appendChild(row);
-  act.appendChild(el('div', 'muted', `seed ${UI.preview.seed} · 같은 seed = 같은 인생`));
+  act.appendChild(el('div', 'muted', 'seed를 입력하면 같은 인생이 재현된다 (결정론적 RNG).'));
   root.appendChild(act);
   root.appendChild(footer());
 }
@@ -141,23 +162,11 @@ function renderDash(g) {
   }
   card.appendChild(s1);
 
-  // 부모 및 가정
-  const s2 = sec('부모 및 가정');
-  s2.appendChild(kv('가정환경', d.family.env));
-  s2.appendChild(kv('아버지', d.family.father, 'mute'));
-  s2.appendChild(kv('어머니', d.family.mother, 'mute'));
-  s2.appendChild(kv('부모 성향', d.family.personality, 'gold'));
-  s2.appendChild(kv('형', d.sibling, 'mute'));
-  s2.appendChild(kv('가계 상태', d.family.household,
-    d.family.household === '안정' ? 'good' : d.family.household === '어려움' ? 'bad' : 'warn'));
-  card.appendChild(s2);
-
   // 경제 / 통산
   const s3 = sec('수입 / 통산');
   s3.appendChild(kv('주급', d.econ.wage, 'good'));
   s3.appendChild(kv('연봉 환산', d.econ.wageYearly, 'mute'));
   s3.appendChild(kv('누적 자산', d.econ.assets, 'good'));
-  s3.appendChild(kv('부채', d.econ.debt, d.econ.hasDebt ? 'bad' : 'mute'));
   s3.appendChild(kv('경기 / 골 / 도움', `${d.career.apps} / ${d.career.goals} / ${d.career.assists}`));
   s3.appendChild(kv('A매치', String(d.career.caps)));
   s3.appendChild(kv('평판', String(d.career.reputation)));
@@ -289,7 +298,7 @@ function renderGame() {
   const auto1 = el('button', 'btn ghost', '이 턴 자동 선택');
   auto1.onclick = () => { autoStep(g); render(); };
   const restart = el('button', 'btn ghost', '처음부터');
-  restart.onclick = () => { UI.game = null; UI.preview = null; UI.screen = 'start'; render(); };
+  restart.onclick = () => { UI.game = null; UI.screen = 'start'; render(); };
   tr.appendChild(auto1); tr.appendChild(restart);
   tools.appendChild(tr);
   tools.appendChild(el('div', 'muted',
@@ -315,16 +324,14 @@ function renderEnding() {
   k.appendChild(el('div', 'k', g.ending.t));
   k.appendChild(el('div', 'd', g.ending.d));
   if (g.ending.epilogue) k.appendChild(el('div', 'epi', g.ending.epilogue));
-  k.appendChild(el('div', 'cell', `엔딩 매트릭스 ${g.ending.cell} · 가정환경 그룹: ${g.ending.groupLabel}`));
+  k.appendChild(el('div', 'cell', `엔딩 티어 ${g.ending.cell}`));
   root.appendChild(k);
 
   const c = el('div', 'card bio');
   c.appendChild(el('h2', null, 'Career Biography'));
   const gr = el('div', 'grid2'); const L = el('div'), R = el('div');
   L.appendChild(kv('이름', b.name)); L.appendChild(kv('생몰', b.span));
-  L.appendChild(kv('가정환경', b.env)); L.appendChild(kv('아버지', b.father));
-  L.appendChild(kv('어머니', b.mother)); L.appendChild(kv('부모 성향', b.personality));
-  L.appendChild(kv('최종 축구 반응', b.reaction)); L.appendChild(kv('포지션', b.position));
+  L.appendChild(kv('국적', b.nationality)); L.appendChild(kv('포지션', b.position));
   R.appendChild(kv('통산 경기', String(b.apps)));
   R.appendChild(kv('골 / 도움', `${b.goals} / ${b.assists}`));
   R.appendChild(kv('대표팀', `${b.ntTeam} — ${b.caps}경기 ${b.ntGoals}골`));
@@ -336,7 +343,6 @@ function renderEnding() {
   R.appendChild(kv('발롱도르', b.awards.ballonDor ? `${b.awards.ballonDor}회` : '없음', b.awards.ballonDor ? 'gold' : 'mute'));
   R.appendChild(kv('UCL 우승 / 참가', `${b.awards.uclTitles}회 / ${b.awards.uclApps}시즌`));
   R.appendChild(kv('통산 수령액', b.totalEarned, 'good'));
-  R.appendChild(kv('남은 부채', b.debt, b.debt === '없음' ? 'mute' : 'bad'));
   gr.appendChild(L); gr.appendChild(R); c.appendChild(gr);
 
   if (b.injuries.length) {
@@ -376,7 +382,7 @@ function renderEnding() {
   const act = el('div', 'card');
   const row = el('div', 'row');
   const again = el('button', 'btn primary', '다른 인생을 살아본다');
-  again.onclick = () => { UI.game = null; UI.preview = null; UI.screen = 'start'; render(); };
+  again.onclick = () => { UI.game = null; UI.screen = 'start'; render(); };
   row.appendChild(again);
   act.appendChild(row);
   act.appendChild(el('div', 'muted', `seed ${g.seed} — 이 인생을 다시 보려면 이 숫자를 입력하면 된다.`));
@@ -394,13 +400,13 @@ function renderBatch() {
   root.innerHTML = '';
   root.appendChild(masthead());
   const info = el('div', 'card');
-  info.appendChild(el('h2', null, '엔진 검증 — 가정환경이 결과를 가르는가'));
+  info.appendChild(el('h2', null, '엔진 검증 — 같은 시작에서 다른 인생이 되는가'));
   info.appendChild(el('div', 'muted',
-    '같은 엔진에 서로 다른 가정환경을 넣었을 때 결과 분포가 실제로 갈라지는지가 이 프로젝트의 1차 검증 기준이다.\n' +
-    '능력치에는 어떤 환경 보정도 없다. 차이는 전부 기회에 대한 접근성에서 나온다.'));
+    '모두 능력 50에서 출발한다. 결과를 가르는 것은 잠재력(성장 속도), 기회, 선택, 그리고 운이다.\n' +
+    '아래는 같은 엔진을 여러 번 돌린 결과 분포다.'));
   const row = el('div', 'row');
-  const n = el('input'); n.type = 'number'; n.value = '500'; n.min = '50'; n.max = '3000';
-  const run = el('button', 'btn primary', '가정환경 7종 비교 실행');
+  const n = el('input', 'finput'); n.type = 'number'; n.value = '500'; n.min = '50'; n.max = '3000';
+  const run = el('button', 'btn primary', '시뮬레이션 실행');
   const back = el('button', 'btn ghost', '← 돌아가기');
   back.onclick = () => { UI.screen = 'start'; render(); };
   const out = el('div');
@@ -411,10 +417,8 @@ function renderBatch() {
     setTimeout(() => {
       out.innerHTML = '';
       const cnt = Math.max(50, Math.min(3000, Number(n.value) || 500));
-      for (const id of Object.keys(FAMILY_ENVS)) {
-        const t0 = performance.now();
-        out.appendChild(batchCard(id, batch(cnt, { env: id, keepSamples: 2 }), performance.now() - t0));
-      }
+      const t0 = performance.now();
+      out.appendChild(batchCard(batch(cnt, { keepSamples: 2 }), performance.now() - t0));
       run.disabled = false;
     }, 30);
   };
@@ -423,9 +427,9 @@ function renderBatch() {
   root.appendChild(info); root.appendChild(out); root.appendChild(footer());
 }
 
-function batchCard(envId, res, ms) {
+function batchCard(res, ms) {
   const c = el('div', 'card');
-  c.appendChild(el('h2', null, `${FAMILY_ENVS[envId].label} — ${res.n}회 (${Math.round(ms)}ms)`));
+  c.appendChild(el('h2', null, `${res.n}회 시뮬레이션 (${Math.round(ms)}ms)`));
   for (const k of ORDER) {
     const v = res.counts[k] || 0;
     const pct = (v / res.n) * 100;

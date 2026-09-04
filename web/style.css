@@ -46,6 +46,14 @@ body{
 input[type=text],input[type=number]{background:var(--navy2);border:1px solid var(--rule);color:var(--tx);
   border-radius:3px;padding:10px 12px;font-family:var(--mono);font-size:12px;width:150px;font-variant-numeric:tabular-nums}
 
+/* ── 선수 만들기 폼 ── */
+.field{display:flex;align-items:center;gap:14px;margin:10px 0}
+.field .flbl{flex:0 0 96px;color:var(--tx2);font-size:12px;letter-spacing:.02em}
+.finput{background:var(--navy2);border:1px solid var(--rule);color:var(--tx);border-radius:3px;
+  padding:10px 12px;font-family:var(--mono);font-size:13px;flex:1;min-width:0}
+select.finput{cursor:pointer}
+.field input.finput{width:auto}
+
 /* ── 레이아웃 ── */
 .stage{display:grid;grid-template-columns:400px 1fr;gap:12px;align-items:start}
 @media(max-width:980px){.stage{grid-template-columns:1fr}}

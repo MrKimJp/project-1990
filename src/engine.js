@@ -5,7 +5,7 @@
  *   2. 능력은 현재 능력(Current Ability) 단일 수치. 세부 스탯은 두지 않는다.
  *   3. 잠재력(PA)·유리몸·빅매치 멘탈·적응력·독기는 히든. 은퇴 후 공개.
  *   4. 재능이 인생을 결정하지 않는다: 환경 × 선택 × 기회 × 운.
- *   5. 가정환경은 능력치가 아니라 "기회에 대한 접근성"으로 작동한다.
+ *   5. 사회경제 레이어(가정환경·가계·부모)는 두지 않는다. 순수한 축구 커리어 시뮬레이션.
  *   6. 16세 이후의 중심 선택은 매 시즌 이적시장이다.
  *   7. DOM 의존 0 — 브라우저 UI와 헤드리스 배치 러너가 같은 엔진을 공유한다.
  * ========================================================================== */
@@ -58,73 +58,6 @@ export const fmtMoney = (v) =>
 
 /* ─────────────────────────── 2. 가정환경 (7종) ─────────────────────────── */
 
-/**
- * 7가지 가정환경. 능력치에는 어떤 보정도 주지 않는다.
- * 작동 방식은 세 가지뿐이다:
- *   money    — 클럽 회비/원정비/사설 훈련에 대한 접근성
- *   safety   — 실패했을 때의 안전망 (안전망이 두터울수록 "축구 말고 다른 길"의 압력이 크다)
- *   scoutBias— 유소년 평가에서의 구조적 편향 (능력이 아니라 평가의 편향)
- *   group    — 엔딩 매트릭스의 4개 그룹
- */
-export const FAMILY_ENVS = {
-  IMM_LOW: {
-    id: 'IMM_LOW', label: '이민자 하위층', group: 'IMM_LOW', immigrant: true,
-    money: 14, safety: 8, academic: 40, scoutBias: -5,
-    blurb: '정착 자체가 매일의 과제다. 서류, 언어, 그리고 고된 노동. 실패하면 돌아갈 곳이 없다.',
-    jobs: ['건설 일용직', '청소 용역', '시장 하역', '식당 주방 보조', '봉제 공장 미싱'],
-  },
-  LOC_LOW: {
-    id: 'LOC_LOW', label: '원주민 하위층', group: 'LOC_LOW', immigrant: false,
-    money: 24, safety: 20, academic: 46, scoutBias: 0,
-    blurb: '이 동네에서 3대를 살았다. 가난이 익숙한 만큼, 경제적 리스크에 대한 공포도 크다.',
-    jobs: ['타파스 바 직원', '시내버스 기사', '섬유 공장 노동', '택시 기사', '항만 하역'],
-  },
-  IMM_MID: {
-    id: 'IMM_MID', label: '이민자 중위층', group: 'IMM_HIGH', immigrant: true,
-    money: 52, safety: 48, academic: 78, scoutBias: -3,
-    blurb: '자리를 잡은 이민자 가정. "우리가 여기까지 온 이유는 네 공부다"라는 말이 집안의 문장이다.',
-    jobs: ['식료품점 운영', '자동차 정비 기술자', '간호조무사', '통역·번역', '소규모 무역 중개'],
-  },
-  LOC_MID: {
-    id: 'LOC_MID', label: '원주민 중위층', group: 'LOC_LOW', immigrant: false,
-    money: 58, safety: 56, academic: 68, scoutBias: 0,
-    blurb: '평범한 중산층. 하고 싶은 건 해도 되지만, 실패했을 때의 대안을 반드시 확인받는다.',
-    jobs: ['초등학교 교사', '은행 창구 직원', '시청 공무원', '전기 기사', '약국 운영'],
-  },
-  IMM_HIGH: {
-    id: 'IMM_HIGH', label: '이민자 상위층', group: 'IMM_HIGH', immigrant: true,
-    money: 84, safety: 78, academic: 88, scoutBias: -2,
-    blurb: '타국에서 성공한 전문직·자본가. 가문의 명예가 개인의 선택보다 앞선다.',
-    jobs: ['무역회사 대표', '치과의사', '건축 설계사', '대학 강사', '수입업체 임원'],
-  },
-  LOC_HIGH: {
-    id: 'LOC_HIGH', label: '원주민 상위층', group: 'LOC_HIGH', immigrant: false,
-    money: 92, safety: 90, academic: 90, scoutBias: 2,
-    blurb: '기득권 엘리트 가문. 축구는 구경하는 것이지, 집안의 아이가 직업으로 삼는 것이 아니다.',
-    jobs: ['변호사', '외과의사', '고위 공무원', '기업 임원', '공증인'],
-  },
-  MIXED: {
-    id: 'MIXED', label: '혼혈·다문화층', group: 'IMM_LOW', immigrant: true,
-    money: 44, safety: 36, academic: 60, scoutBias: -2,
-    blurb: '두 개의 문화 사이에서 자란다. 정체성은 복잡하지만, 인맥은 어디로든 뻗어 있다.',
-    jobs: ['재즈 클럽 운영', '국제학교 교사', '프리랜서 사진가', 'NGO 활동가', '음악 강사'],
-  },
-};
-
-/** 부모 기본 성향 — 고정. 게임 내내 바뀌지 않는다. */
-export const PARENT_PERSONALITIES = {
-  CYNIC:   { id: 'CYNIC',   label: '냉소적', blurb: '"세상에 되는 놈은 정해져 있다." 기대를 하지 않는 방식으로 아이를 보호한다.', bias: -1 },
-  PASSION: { id: 'PASSION', label: '열정적', blurb: '한번 믿으면 끝까지 간다. 대신 기대가 무거워서 아이가 눌린다.', bias: +1 },
-  NEUTRAL: { id: 'NEUTRAL', label: '중립',   blurb: '판단을 유보한다. 결과를 보고 나서 태도를 정하는 쪽이다.', bias: 0 },
-};
-
-/** 부모의 축구 반응 — 성적·이적·학업·부상에 따라 실시간으로 변한다. */
-export const REACTIONS = [
-  { key: 'SKEPTIC',    label: '회의적',      blurb: '"축구로 밥 먹고 사는 애가 몇이나 되는지 아냐."' },
-  { key: 'INDIFFERENT',label: '별 관심없음', blurb: '반대도 응원도 하지 않는다. 알아서 하라는 쪽이다.' },
-  { key: 'INTERESTED', label: '흥미',        blurb: '주말 경기를 보러 온다. 상대 팀 전력까지 물어본다.' },
-  { key: 'SUPPORTIVE', label: '응원중',      blurb: '집안의 우선순위가 이 아이의 축구에 맞춰져 있다.' },
-];
 
 const SPANISH_FIRST = ['Alejandro', 'Sergio', 'Iker', 'Pau', 'Marc', 'Javier', 'Rubén', 'Óscar', 'Adrián', 'Hugo', 'Álvaro', 'Dani'];
 const SPANISH_LAST = ['Martín', 'García', 'Ortega', 'Ferrer', 'Bosch', 'Navarro', 'Vidal', 'Lorente', 'Serra', 'Iglesias', 'Cabrera', 'Solana'];
@@ -482,30 +415,16 @@ export function newGame(opts = {}) {
   const seed = opts.seed ?? (Math.random() * 2 ** 31) | 0;
   const rng = makeRng(seed);
 
-  const envId = opts.env ?? rng.weighted([
-    { w: 20, v: 'IMM_LOW' }, { w: 18, v: 'LOC_LOW' }, { w: 17, v: 'IMM_MID' },
-    { w: 20, v: 'LOC_MID' }, { w: 7, v: 'IMM_HIGH' }, { w: 8, v: 'LOC_HIGH' }, { w: 10, v: 'MIXED' },
-  ]).v;
-  const env = FAMILY_ENVS[envId];
-  const persId = opts.personality ?? rng.pick(['CYNIC', 'PASSION', 'NEUTRAL']);
-  const pers = PARENT_PERSONALITIES[persId];
+  // 국적은 시작 화면에서 고른다. 대표팀 자격과 기본 이름 풀을 결정한다.
+  const nat = (opts.nationality && NT_NAME[opts.nationality]) ? opts.nationality : 'ESP';
+  const pool = IMMIGRANT_BG.find((b) => b.nat === nat);
+  const defaultName = (nat === 'ESP' || !pool)
+    ? `${rng.pick(SPANISH_FIRST)} ${rng.pick(SPANISH_LAST)}`
+    : `${rng.pick(pool.first)} ${rng.pick(pool.last)}`;
+  // 이름은 플레이어가 직접 입력한다. 비워두면 국적에 맞는 임의 이름을 쓴다.
+  const name = (opts.name && String(opts.name).trim().slice(0, 40)) || defaultName;
 
-  const bg = env.immigrant ? rng.pick(IMMIGRANT_BG) : null;
-  const name = bg
-    ? `${rng.pick(bg.first)} ${rng.pick(bg.last)}`
-    : `${rng.pick(SPANISH_FIRST)} ${rng.pick(SPANISH_LAST)}`;
-  const surname = name.split(' ').slice(1).join(' ');
-
-  const father = {
-    name: bg ? `${rng.pick(bg.pa)} ${surname}` : `${rng.pick(FATHER_ES)} ${surname}`,
-    age1990: rng.int(28, 38), job: rng.pick(env.jobs), trust: 52,
-  };
-  const mother = {
-    name: bg ? `${rng.pick(bg.ma)} ${surname}` : `${rng.pick(MOTHER_ES)} ${surname}`,
-    age1990: rng.int(25, 35), job: rng.pick(env.jobs), trust: 60,
-  };
-
-  const posId = opts.position ?? rng.weighted([
+  const posId = (opts.position && POSITIONS[opts.position]) ? opts.position : rng.weighted([
     { w: 8, v: 'GK' }, { w: 16, v: 'CB' }, { w: 15, v: 'FB' }, { w: 18, v: 'CM' },
     { w: 14, v: 'AM' }, { w: 16, v: 'WG' }, { w: 13, v: 'ST' },
   ]).v;
@@ -514,14 +433,9 @@ export function newGame(opts = {}) {
   // (우편향으로 두면 대부분이 저잠재력에 몰려 성장 속도 차이가 잘 드러나지 않는다)
   const potential = rng.int(58, 99);
 
-  // 초기 부모 반응 — 성향 + 가정환경의 안전망 압력으로 결정된다
-  let react = 1 + pers.bias - (env.safety > 70 ? 1 : 0);
-  react = clamp(react, 0, 3);
-
   const p = {
-    name, birthYear: 1990, env: envId, personality: persId,
-    immigrantBg: bg ? bg.label : null,
-    nationality: 'ESP', secondNationality: bg ? bg.nat : null,
+    name, birthYear: 1990,
+    nationality: nat,
     position: posId,
     ovr: 6, peakOvr: 6,
     hidden: {
@@ -536,9 +450,9 @@ export function newGame(opts = {}) {
       pro: clamp(round(rng.norm(50, 16)), 8, 96),
     },
     confidence: 50, stress: 20, fitness: 100, form: 55,
-    willToPlay: 68, academic: clamp(round(env.academic + rng.norm(0, 8)), 10, 98),
+    willToPlay: 68, academic: clamp(round(rng.norm(55, 12)), 10, 98),
     trait: { ambition: 50, pride: 50, loyalty: 50, adaptability: 50, risk: 50 },
-    econ: { wageYear: 0, assets: 0, household: env.money, debt: 0, debtRate: 0, totalEarned: 0 },
+    econ: { wageYear: 0, assets: 0, totalEarned: 0 },
     awards: { ballonDor: 0, ballonTop3: 0, uclTitles: 0, uclApps: 0, goldenBoot: 0, leagueMVP: 0, topScorer: 0 },
     club: null, loanFrom: null, contractUntil: null,
     reputation: 2, peakReputation: 0,
@@ -548,30 +462,16 @@ export function newGame(opts = {}) {
   };
 
   const g = {
-    version: 3, seed, rng, player: p,
-    world: { year: 1990, phase: 'SUMMER', reaction: react, academyAccess: 0, boom: 0 },
-    npcs: {
-      father, mother, coach: { trust: 50 }, agent: null,
-      // 형 — 별도 트랙으로 진행되는 서브플롯
-      sibling: {
-        name: bg ? `${rng.pick(bg.first)} ${surname}` : `${rng.pick(SPANISH_FIRST)} ${surname}`,
-        age1990: rng.int(2, 6),
-        state: 'STABLE',      // STABLE → DRIFT → SLUM → INCIDENT → (RECOVER|PRISON|DEAD)
-        risk: clamp(round(rng.norm(env.safety < 30 ? 42 : 24, 14)), 3, 88),
-        helped: 0,
-      },
-    },
+    version: 4, seed, rng, player: p,
+    world: { year: 1990, phase: 'SUMMER', academyAccess: 0, boom: 0 },
+    npcs: { coach: { trust: 50 }, agent: null },
     memories: [], flags: {}, log: [], news: [],
     pending: null, turn: 0, over: false, ending: null,
   };
 
-  pushLog(g, 'header', `${p.name} — 1990년 7월 18일, 바르셀로나`);
+  pushLog(g, 'header', `${p.name} — 1990년생 · ${NT_NAME[nat]}`);
   pushLog(g, 'birth',
-    `가정환경   ${env.label}${bg ? ` · ${bg.label} 출신` : ''}\n` +
-    `아버지     ${father.name} (1990년 ${father.age1990}세) — ${father.job}\n` +
-    `어머니     ${mother.name} (1990년 ${mother.age1990}세) — ${mother.job}\n` +
-    `부모 성향  ${pers.label} — ${pers.blurb}\n` +
-    `축구 반응  ${REACTIONS[react].label}\n` +
+    `국적       ${NT_NAME[nat]}\n` +
     `포지션     ${POSITIONS[posId].label}`);
   beginTurn(g);
   // 유년기는 플레이하지 않는다. 시뮬레이션만 돌리고 그 결과를 산문으로 제시한다.
@@ -626,42 +526,29 @@ function runBackstory(g) {
   g.backstory = prose;
   // 유년기 턴 로그를 지우고 배경설정으로 대체한다
   g.log = [];
-  pushLog(g, 'header', `${g.player.name} — 1990년 7월 18일, 바르셀로나`);
+  pushLog(g, 'header', `${g.player.name} — 1990년생 · ${NT_NAME[g.player.nationality]}`);
   pushLog(g, 'backstory', prose);
   setNews(g, `${g.world.year}년: 만 16세. 프로가 되기 위한 첫 여름.`);
 }
 
 function buildBackstory(g) {
-  const p = g.player, f = g.npcs.father, m = g.npcs.mother, sib = g.npcs.sibling;
-  const env = FAMILY_ENVS[p.env];
+  const p = g.player;
   const L = [];
 
-  L.push(`${p.name}. 1990년 7월 18일, 바르셀로나 산츠 지구.`);
-  L.push('');
-  if (env.immigrant) {
-    L.push(`아버지 ${f.name}은 ${p.immigrantBg}에서 왔다. 1990년 당시 ${f.age1990}세, 직업은 ${f.job}였다.`);
-    L.push(`올림픽을 앞둔 도시는 사람을 무한히 필요로 했고, 서류가 완전하지 않은 남자에게도 일을 줬다.`);
-    L.push(`어머니 ${m.name}(${m.age1990}세)은 ${m.job}으로 새벽에 나갔다. 두 사람이 벌어오는 돈으로 살았다.`);
-  } else {
-    L.push(`아버지 ${f.name}(${f.age1990}세)은 ${f.job}, 어머니 ${m.name}(${m.age1990}세)은 ${m.job}이다.`);
-    L.push(`이 도시에서 3대를 살았고, 가족 모두가 어느 팀을 응원하는지는 태어날 때 이미 정해져 있었다.`);
-  }
-  L.push(env.blurb);
+  L.push(`${p.name}. 1990년생, ${NT_NAME[p.nationality]} 국적. 축구를 시작한 곳은 바르셀로나의 골목이었다.`);
   L.push('');
 
   if (hasMemory(g, 'no_money_youth')) {
-    L.push(`축구를 시작한 건 선택이 아니라 위치였다. 아파트 아래 골목이 경기장이었다.`);
-    L.push(`여섯 살에 동네 클럽 등록 시즌이 왔지만 회비를 내지 못했다. 몇 년을 골목에서만 찼다.`);
+    L.push(`처음 몇 년은 등록도 없이 골목에서만 찼다. 아파트 아래 좁은 길이 경기장이었다.`);
   } else if (g.flags.registered) {
     L.push(`여섯 살에 동네 클럽 유소년팀에 등록했다. 유니폼은 사이즈가 두 단계 커서 무릎까지 내려왔다.`);
   } else {
     L.push(`정식 등록 없이 학교와 골목에서만 찼다. 아무도 지켜보지 않는 축구였다.`);
   }
-  if (hasMemory(g, 'promise_school')) L.push(`아홉 살에 "성적은 유지하겠다"는 조건으로 축구를 허락받았다. 그 약속은 아직 유효하다.`);
+  if (hasMemory(g, 'promise_school')) L.push(`아홉 살에 "성적은 유지하겠다"는 조건을 걸고 훈련을 늘렸다.`);
   L.push('');
 
   L.push(`2002년 여름, 열두 살에 FC 바르셀로나 유소년 테스트를 봤다. 400명이 왔다.`);
-  if (env.immigrant) L.push(`접수처에서 서류를 두 번 확인받았다. 앞의 아이들은 한 번이었다.`);
   if (hasMemory(g, 'academy_in')) {
     L.push(`합격했다. 라 마시아 숙소에 짐을 풀었다. 같은 방 아이 셋 다 자기 지역에서 제일 잘하는 애였다.`);
   } else if (hasMemory(g, 'rejection')) {
@@ -678,7 +565,6 @@ function buildBackstory(g) {
   L.push(`이후 ${yc} 유소년팀에서 뛰었다.`);
   const inj = (p.career.injuries || [])[0];
   if (inj) L.push(`${inj.age}세에 ${inj.name}으로 ${inj.weeks}주를 쉬었다. 그때 몸이 예전과 달라졌다.`);
-  if (sib.state !== 'STABLE') L.push(`형 ${sib.name}은 학교를 그만뒀다. 동네에서 형의 이름이 다르게 불리기 시작했다.`);
   L.push(`학업은 ${p.academic >= 65 ? '상위권으로 유지했다' : p.academic >= 45 ? '중간 정도였다' : '거의 놓았다'}.`);
   L.push('');
 
@@ -689,43 +575,10 @@ function buildBackstory(g) {
   }
   L.push(`${g.world.year}년 여름. 만 16세. 후베닐 계약이 끝난다.`);
   L.push(`현재 능력 ${ability(g)} (${abilityLabel(ability(g))}) · 소속 ${yc}`);
-  L.push(`이 도시에서 유소년 등록 선수가 프로 계약에 도달하는 비율은 1% 아래다. 여기서부터가 시작이다.`);
+  L.push(`유소년 등록 선수가 프로 계약에 도달하는 비율은 한 자릿수다. 여기서부터가 시작이다.`);
   return L.join('\n');
 }
 
-/** 1990년 바르셀로나 정착 에피소드 */
-function settlementStory(g) {
-  const env = FAMILY_ENVS[g.player.env];
-  const f = g.npcs.father, m = g.npcs.mother;
-  const bg = g.player.immigrantBg;
-  const common = `1990년 7월의 바르셀로나는 공사장이다. 2년 뒤 올림픽을 치르기 위해 도시 전체를 뒤집어 놓았고, 어디를 가도 크레인과 철골이 보인다. 그 소음 속에서 아이가 태어났다.`;
-  if (env.immigrant) {
-    return `${common}\n\n${f.name}과 ${m.name}은 ${bg}에서 왔다. ${f.age1990}세와 ${m.age1990}세. ` +
-      `${f.job}과 ${m.job}으로 버틴다. 서류는 아직 완전하지 않고, 카탈루냐어는 시장에서 쓰는 말만 안다.\n\n` +
-      `${env.blurb}\n\n` +
-      `아파트는 엘리베이터가 없는 5층이다. 창문을 열면 아래 골목에서 아이들이 벽에 공을 차는 소리가 올라온다. ` +
-      `이 소리는 앞으로 20년간 이 아이의 배경음이 된다.`;
-  }
-  return `${common}\n\n${f.name}(${f.age1990}세)은 ${f.job}, ${m.name}(${m.age1990}세)은 ${m.job}이다. ` +
-    `이 도시에서 3대째 살았고, 가족 모두가 어느 팀을 응원하는지는 태어날 때 이미 정해져 있다.\n\n` +
-    `${env.blurb}\n\n` +
-    `창문을 열면 아래 골목에서 아이들이 벽에 공을 차는 소리가 올라온다. 이 소리는 앞으로 20년간 이 아이의 배경음이 된다.`;
-}
-
-export function rollSummary(g) {
-  const env = FAMILY_ENVS[g.player.env];
-  const pers = PARENT_PERSONALITIES[g.player.personality];
-  return {
-    name: g.player.name,
-    env: env.label + (g.player.immigrantBg ? ` · ${g.player.immigrantBg} 출신` : ''),
-    envBlurb: env.blurb,
-    personality: pers.label, personalityBlurb: pers.blurb,
-    reaction: REACTIONS[g.world.reaction].label,
-    position: POSITIONS[g.player.position].label,
-    father: `${g.npcs.father.name} (${g.npcs.father.age1990}세) — ${g.npcs.father.job}`,
-    mother: `${g.npcs.mother.name} (${g.npcs.mother.age1990}세) — ${g.npcs.mother.job}`,
-  };
-}
 
 /* ─────────────────────────── 6. 로그 / 기억 / 근황 ─────────────────────────── */
 
@@ -745,16 +598,8 @@ function setNews(g, text) {
 }
 
 /** 부모 반응은 성적·이적·학업·부상에 따라 실시간으로 변한다 */
-function shiftReaction(g, d, why) {
-  const before = g.world.reaction;
-  const bias = PARENT_PERSONALITIES[g.player.personality].bias;
-  // 냉소적인 부모는 좋은 소식에 덜 반응하고, 열정적인 부모는 더 크게 반응한다
-  const adj = d > 0 ? d + (bias > 0 ? 1 : bias < 0 ? -1 : 0) : d;
-  g.world.reaction = clamp(g.world.reaction + adj, 0, 3);
-  if (g.world.reaction !== before && why) {
-    pushLog(g, 'parent', `부모의 반응이 「${REACTIONS[before].label}」 → 「${REACTIONS[g.world.reaction].label}」로 바뀌었다. (${why})`);
-  }
-}
+// 가족/부모 시스템은 제거됐다. 옛 호출부를 깨뜨리지 않기 위한 no-op.
+function shiftReaction() {}
 
 /* ─────────────────────────── 7. 시간 ─────────────────────────── */
 
@@ -810,7 +655,8 @@ function trainingQuality(g) {
     if (last && last.apps < 6 && ageOf(g) >= 17) q -= 12;
     return clamp(q, 20, 100);
   }
-  return clamp(30 + (g.world.academyAccess ? 16 : 0) + p.econ.household * 0.12, 15, 70);
+  // 클럽이 없는 유년 초기의 훈련 환경 — 아카데미 접근 + 본인의 자기관리(pro)로 결정된다.
+  return clamp(38 + (g.world.academyAccess ? 18 : 0) + (p.hidden.pro - 50) * 0.12, 15, 70);
 }
 
 /** 환경 천장 — 잠재력은 환경이 허락하는 만큼만 열린다 */
@@ -1028,22 +874,7 @@ function simulatePeriod(g) {
     injuryNote = rollInjury(g, age);
   }
 
-  // 부채 이자 — 갚지 않으면 늘어난다
-  if (p.econ.debt > 0) {
-    const interest = round(p.econ.debt * p.econ.debtRate * periodYears(g));
-    p.econ.debt += interest;
-    const pay = Math.min(p.econ.assets, round(p.econ.debt * 0.35));
-    if (pay > 0) { p.econ.assets -= pay; p.econ.debt -= pay; }
-    if (p.econ.debt <= 0) {
-      p.econ.debt = 0; p.econ.debtRate = 0;
-      p.stress = clamp(p.stress - 18, 0, 100);
-      pushLog(g, 'debt', '빚을 다 갚았다. 통장을 확인하고 한참 앉아 있었다.');
-      remember(g, 'debt_clear', `${g.world.year}년, 빚을 전부 청산했다.`, 0.8);
-    } else if (interest > 0) {
-      pushLog(g, 'debt', `부채 ${fmtMoney(p.econ.debt)} (이자 ${fmtMoney(interest)} 발생${pay ? ` · ${fmtMoney(pay)} 상환` : ''})`);
-      p.stress = clamp(p.stress + 4, 0, 100);
-    }
-  }
+  // 부채 시스템 제거됨.
 
   let salary = 0;
   if (seniorClub) {
@@ -1365,37 +1196,6 @@ function recordCaps(g, caps, nt) {
   last.ntName = NT_NAME[nt];
 }
 
-/**
- * 아버지의 고용 상태 판정. 결정론적 체인("2008 → 반드시 실직")을 제거하고
- * 세계 경제 상태 × 가정의 안전망으로 확률을 계산한다.
- */
-const FATHER_OUTCOME = {
-  KEEP:   '직장 유지',
-  PAYCUT: '임금 삭감',
-  HOURS:  '근무시간 감소',
-  FIRED:  '실직',
-  MOVED:  '다른 직장으로 이동',
-};
-function rollFatherEmployment(g, pressure) {
-  const env = FAMILY_ENVS[g.player.env];
-  const f = g.npcs.father;
-  if (f.status === '실직' || f.status === '은퇴') return null;
-  const fragile = clamp(100 - env.safety, 8, 95);          // 안전망이 얇을수록 취약
-  const r = g.rng.weighted([
-    { w: 62 - fragile * 0.28 - pressure * 0.22, v: 'KEEP' },
-    { w: 14 + fragile * 0.08 + pressure * 0.10, v: 'PAYCUT' },
-    { w: 9 + fragile * 0.05 + pressure * 0.05, v: 'HOURS' },
-    { w: 5 + fragile * 0.18 + pressure * 0.14, v: 'FIRED' },
-    { w: 6 + fragile * 0.03, v: 'MOVED' },
-  ]).v;
-  f.status = FATHER_OUTCOME[r] === '직장 유지' ? null : FATHER_OUTCOME[r];
-  f.statusYear = g.world.year;
-  if (r === 'MOVED') f.job = g.rng.pick(env.jobs);
-  const hit = { KEEP: 0, PAYCUT: -8, HOURS: -5, FIRED: -18, MOVED: -3 }[r];
-  if (hit) g.player.econ.household = clamp(g.player.econ.household + hit, 0, 100);
-  return { key: r, label: FATHER_OUTCOME[r], hit };
-}
-
 function nationalTeamCheck(g) {
   const p = g.player;
   const age = ageOf(g);
@@ -1455,7 +1255,7 @@ export function marketClimate(g) {
 
 function scoutedValue(g, club) {
   const p = g.player;
-  const bias = ageOf(g) <= 18 ? FAMILY_ENVS[p.env].scoutBias : 0;
+  const bias = 0;
   const err = g.rng.norm(0, 6.5) * (1 - (club.expo / 100) * 0.45);
   const cond = (p.form - 55) / 4 + g.rng.norm(0, 3);
   return p.ovr * 0.75 + (p.ovr + err) * 0.15 + (p.ovr + cond) * 0.10 + p.reputation * 0.12 + bias;
@@ -1658,21 +1458,18 @@ function offerChoices(g, offers, { loan = false, agreed = false } = {}) {
 const EVENTS = [];
 const ev = (o) => EVENTS.push(o);
 const A = (g) => ageOf(g);
-const ENV = (g) => FAMILY_ENVS[g.player.env];
+// 가정환경 제거됨. 옛 참조부가 안전하게 동작하도록 중립 기본값을 반환한다.
+const ENV = () => ({ immigrant: false, scoutBias: 0, safety: 50, money: 50, academic: 55, blurb: '', label: '', group: 'LOC_LOW' });
 
 ev({
   id: 'first_ball', once: true, when: (g) => A(g) === 6, w: () => 900,
-  body: (g) => {
-    const e = ENV(g);
-    return `여섯 살. 동네 클럽 유소년팀 등록 시즌이다.\n\n` +
-      `가정환경: ${e.label} — ${e.blurb}\n` +
-      `부모 반응: ${REACTIONS[g.world.reaction].label} — ${REACTIONS[g.world.reaction].blurb}\n\n` +
-      `등록하려면 회비를 내야 하고, 누군가는 매주 아이를 데려다줘야 한다.`;
-  },
+  body: () =>
+    `여섯 살. 동네 클럽 유소년팀 등록 시즌이다.\n\n` +
+    `등록하려면 회비를 내야 하고, 누군가는 매주 아이를 데려다줘야 한다.`,
   choices: () => [
     { t: '"등록하자. 골목에서만 차면 아무도 안 봐."', meta: '정식 유소년 코스의 출발점', risk: 'SAFE', parent: 1, injury: 1, tags: ['ambition'],
       fx: (gg) => {
-        const ok = gg.rng.chance(clamp(0.32 + gg.player.econ.household / 140 + gg.world.reaction * 0.13, 0.1, 0.95));
+        const ok = gg.rng.chance(0.72);
         if (ok) {
           joinClub(gg, deriveClub('동네 클럽 유소년팀', 34, { id: 'youth', name: '바르셀로나 지역 유소년리그', nat: 'ESP', div: 3, home: true, youth: true }), { years: 8 });
           gg.player.willToPlay += 12; gg.flags.registered = true;
@@ -1692,26 +1489,18 @@ ev({
 
 ev({
   id: 'parent_turn', once: true, when: (g) => A(g) === 9, w: () => 900,
-  body: (g) => `아홉 살. 지역 리그에서 눈에 띄기 시작했다.\n\n` +
-    `아버지 ${g.npcs.father.name} (${g.npcs.father.job}) · 어머니 ${g.npcs.mother.name} (${g.npcs.mother.job})\n` +
-    `부모 성향: ${PARENT_PERSONALITIES[g.player.personality].label}\n` +
-    `현재 반응: ${REACTIONS[g.world.reaction].label} — ${REACTIONS[g.world.reaction].blurb}`,
+  body: () => `아홉 살. 지역 리그에서 눈에 띄기 시작했다.\n\n` +
+    `코치가 훈련을 더 늘려보자고 한다. 학교와 축구 사이에서 시간을 어떻게 쓸지 정해야 한다.`,
   choices: () => [
-    { t: '"성적은 지키겠다고 약속하자. 그거면 훈련을 늘릴 수 있어."', meta: '학업 +  스트레스 +', risk: 'SAFE', parent: 1, injury: 0, tags: ['discipline'],
-      fx: (gg) => { shiftReaction(gg, 1, '학업 유지 약속'); gg.player.stress += 8; gg.player.academic += 6; },
-      out: (gg) => { remember(gg, 'promise_school', `${gg.world.year}년, 성적 유지를 조건으로 축구를 허락받았다.`, 0.7); return '거래가 성립했다. 이 약속은 20년 뒤에 다시 소환된다.'; } },
-    { t: '"그냥 말해버리자. 나 축구밖에 없어."', meta: '성공 시 반응 급상승 / 실패 시 급하락', risk: 'HIGH', parent: 2, injury: 0, tags: ['pride', 'risk'],
-      fx: (gg) => {
-        const ok = gg.rng.chance(0.38 + gg.world.reaction * 0.12);
-        shiftReaction(gg, ok ? 2 : -1, ok ? '아이의 각오를 인정' : '충돌');
-        gg.player.willToPlay += 10; gg.player.academic -= 8; gg.player.trait.pride += 8;
-      },
-      out: (gg) => gg.world.reaction >= 2
-        ? '한참 말이 없다가 고개를 끄덕였다. "그럼 진짜로 해라."'
-        : '방문이 닫혔다. 그 뒤로 식탁에서 축구 얘기가 사라졌다.' },
-    { t: '"말해서 뭐 해. 그냥 계속 나가면 되지."', meta: '독기 + · 부모 반응 변화 없음', risk: 'MID', parent: 0, injury: 0, tags: [],
+    { t: '"성적은 지키면서 훈련을 늘리자. 둘 다 놓치기 싫어."', meta: '학업 +  스트레스 +', risk: 'SAFE', parent: 1, injury: 0, tags: ['discipline'],
+      fx: (gg) => { gg.player.stress += 8; gg.player.academic += 6; },
+      out: (gg) => { remember(gg, 'promise_school', `${gg.world.year}년, 성적을 유지하는 조건으로 훈련을 늘렸다.`, 0.7); return '스스로 건 약속이다. 이 약속은 나중에 다시 떠오른다.'; } },
+    { t: '"축구에 다 걸자. 나 이거밖에 없어."', meta: '축구 의지 + · 학업 −', risk: 'HIGH', parent: 2, injury: 0, tags: ['pride', 'risk'],
+      fx: (gg) => { gg.player.willToPlay += 10; gg.player.academic -= 8; gg.player.trait.pride += 8; },
+      out: () => '학교 가방보다 축구화를 먼저 챙기는 날이 늘었다.' },
+    { t: '"지금처럼만 하자. 서두를 거 없어."', meta: '독기 +', risk: 'MID', parent: 0, injury: 0, tags: [],
       fx: (gg) => { gg.player.hidden.grit += 8; gg.player.willToPlay += 4; },
-      out: () => '허락도 반대도 받지 않았다. 그냥 매일 나갔다.' },
+      out: () => '남들 하는 만큼. 그냥 매일 나갔다.' },
   ],
 });
 
@@ -1810,7 +1599,6 @@ export function proEntryScore(g) {
     스카우트노출: (p.reputation - 10) * 0.35,
     부상: p.injuryWeeks > 0 ? -16 : 0,
     에이전트: g.npcs.agent ? 5 : -2,
-    가계압박: p.econ.household < 30 ? -3 : 0,
     학업: p.academic > 78 ? -2 : 0,
     야망: (p.trait.ambition - 50) * 0.14,
     자기관리: (p.hidden.pro - 50) * 0.12,
@@ -1913,156 +1701,6 @@ ev({
         out: () => '마지막 훈련이 끝나고 라커룸에서 이름표를 떼는 데 10초가 걸렸다.' },
     ];
   },
-});
-
-ev({
-  id: 'father_joblss', once: true,
-  // 아버지가 실제로 일을 잃은 뒤에만 발동한다 (연도가 원인이 아니다)
-  when: (g) => g.player.active && A(g) >= 18 && A(g) <= 30 && g.world.phase === 'SUMMER' &&
-    g.npcs.father.status === '실직',
-  w: () => 300,
-  body: (g) => {
-    const f = g.npcs.father, m = g.npcs.mother;
-    const age = f.age1990 + (g.world.year - 1990);
-    const mortgage = 620 + g.rng.int(0, 180);
-    g.flags._mortgage = mortgage;
-    const crisis = g.world.year >= 2008 && g.world.year <= 2013;
-    return `${g.world.year}년 여름.${crisis ? ' 스페인 실업률이 20%를 넘었다. 크레인이 멈춘 도시에서 일자리가 사라지고 있다.' : ''}\n\n` +
-      `아버지 ${f.name}이 일하던 곳이 문을 닫았다. ${age}세, ${f.job}. 이 나이에 다음 자리는 없다.\n` +
-      `아버지는 그 얘기를 한 달 뒤에 했다. 그동안 매일 아침 같은 시간에 집을 나갔다고 했다.\n` +
-      `어머니 ${m.name}은 ${m.job} 일을 야간까지 늘렸다.\n\n` +
-      `집 대출이 남아 있다. 월 €${mortgage}.\n\n` +
-      `나는 지금 ${g.player.club ? g.player.club.name : '무소속'}에서 주급 ${fmtWeekly(g.player.econ.wageYear)}을 받는다.\n` +
-      `세후로 나누면 이 집 생활비의 절반쯤 된다. 만 ${A(g)}세에 처음으로, 내 계약이 가족의 재무 계획에 들어갔다.\n\n` +
-      `식탁에서 아무도 그 얘기를 먼저 꺼내지 않는다. 그게 이 집의 방식이다.\n` +
-      `나는 훈련이 끝나고 차 안에서 계산기를 두 번 두드렸다.`;
-    },
-  choices: (g) => {
-    const total = g.flags._mortgage * 12 * 8;
-    const rich = g.player.econ.assets >= total * 1.15;   // 문제 6: 돈이 있으면 대출을 끼지 않는다
-    const list = [];
-    if (rich) list.push({
-      t: '남은 대출을 일시불로 갚아버린다.',
-      meta: `자산 ${fmtMoney(total)} 지출 · 부채 없음 · 가족 관계 최상`,
-      tags: ['family'],
-      fx: (gg) => {
-        gg.player.econ.assets -= total;
-        gg.npcs.father.trust = 98; gg.npcs.father.status = '실직'; gg.npcs.father.statusYear = gg.world.year;
-        gg.player.stress -= 4;
-        remember(gg, 'paid_off_home', `${gg.world.year}년, 부모님 집 대출을 한 번에 갚았다.`, 0.9);
-      },
-      out: () => '은행에 가서 한 번에 정리했다. 통장 숫자가 확 줄었지만, 이자라는 단어를 다시 볼 일이 없어졌다.\n어머니가 서류를 액자에 넣어뒀다.',
-    });
-    if (!rich) list.push({
-      t: '내 주급으로 집 대출을 넘겨받는다.',
-      meta: `부채 ${fmtMoney(total)} 이전 (은행 이자 9%) · 자산 축적 대폭 감소 · 가족 관계 최상`,
-      tags: ['family'],
-      fx: (gg) => {
-        gg.player.econ.debt += total;
-        gg.player.econ.debtRate = 0.09;
-        gg.npcs.father.trust = 98; gg.player.stress += 10;
-        shiftReaction(gg, 1, '가족의 대출을 넘겨받음');
-        remember(gg, 'took_mortgage', `${gg.world.year}년, 아버지의 집 대출을 내 이름으로 넘겼다.`, 0.9);
-      },
-      out: () => '서류에 서명하는 데 20분이 걸렸다. 아버지는 그 자리에 오지 않았다.\n집을 지켰다. 대신 앞으로 몇 년간 내 통장은 내 것이 아니다.' });
-    list.push({ t: '"돈 되는 데로 가자. 지금은 집이 먼저야."',
-      meta: '다음 이적시장에서 연봉 높은 오퍼를 우선 수락 · 축구적 성장 리스크',
-      tags: ['ambition'],
-      fx: (gg) => { gg.flags.chaseMoney = true; gg.player.stress += 6; remember(gg, 'chase_money', `${gg.world.year}년, 가계 때문에 돈을 따라가기로 했다.`, 0.75); },
-      out: () => '에이전트에게 전화했다. "주급 제일 높은 데로 보내주세요."\n그 통화 이후, 내 커리어의 기준이 하나 바뀌었다.' });
-    list.push({ t: '"생활비는 매달 보내자. 대신 커리어는 안 건드려."',
-      meta: `자산 축적 −30% · 스트레스 + · 부채 없음`,
-      tags: ['safe'],
-      fx: (gg) => { gg.flags.sendsMoney = true; gg.player.stress += 8; gg.player.econ.household = clamp(gg.player.econ.household + 8, 0, 100); },
-      out: () => '매달 정해진 날에 송금한다. 아버지는 한 번도 고맙다고 하지 않았고, 나는 그걸 이해했다.' });
-    return list;
-  },
-});
-
-ev({
-  id: 'sibling_bail', once: true,
-  when: (g) => g.player.active && A(g) >= 19 && A(g) <= 30 && g.npcs.sibling.risk > 50,
-  w: (g) => 16 + (g.npcs.sibling.risk - 50) * 1.8,
-  body: (g) => {
-    const sib = g.npcs.sibling;
-    const bail = 9000 + g.rng.int(0, 8) * 1000;
-    g.flags._bail = bail;
-    return `${g.world.year}년 1월. 겨울 이적시장이 열린 주에 전화가 왔다.\n\n` +
-      `새벽 두 시였다. 어머니 목소리가 아니었다. 경찰서 통역이었다.\n` +
-      `형 ${sib.name}이 산츠 역 뒤편에서 붙잡혔다. 소지 혐의. 판매 목적이 붙으면 형량이 달라진다고 했다.\n` +
-      `보석금 ${fmtMoney(bail)}. 사흘 안에.\n\n` +
-      `이 동네에서 형의 이름은 몇 년 전부터 다르게 불렸다. 축구를 그만둔 뒤 형은 나보다 훨씬 빠르게 어른이 됐고,\n` +
-      `어떤 방식으로 돈을 벌었는지 가족 모두가 알면서 아무도 묻지 않았다.\n` +
-      `나는 그 돈으로 산 축구화를 두 번 신었다.\n\n` +
-      `지금 통장에 ${fmtMoney(g.player.econ.assets)}이 있다.\n` +
-      `어머니는 울지 않았다. 그게 더 견디기 어려웠다.\n` +
-      `전화를 끊고 훈련장에 나갔다. 그날 슈팅이 하나도 안 들어갔다.`;
-  },
-  choices: (g) => (g.player.econ.assets >= g.flags._bail * 1.2 ? [
-    { t: '"그냥 내 돈으로 내자. 이제 그럴 수 있잖아."',
-      meta: `자산 ${fmtMoney(g.flags._bail)} 지출 · 부채 없음 · 형 관계 회복`,
-      tags: ['family'],
-      fx: (gg) => {
-        gg.player.econ.assets -= gg.flags._bail;
-        gg.npcs.sibling.helped += 1; gg.npcs.sibling.risk -= 18; gg.player.stress += 8;
-        remember(gg, 'bail_paid_cash', `${gg.world.year}년, 형의 보석금을 내 돈으로 냈다.`, 0.85);
-      },
-      out: () => '계좌 이체 한 번으로 끝났다. 스무 살의 나에게는 불가능했던 일이다.\n형은 사흘 뒤에 나왔고, 아무 말도 하지 않고 내 어깨를 한 번 쳤다.' },
-  ] : [
-    { t: '"사채라도 쓰자. 형을 저기 두고 잠이 오겠어?"',
-      meta: `부채 ${fmtMoney(g.flags._bail)} (연이자 34%) · 스트레스 ++ · 형 관계 회복`,
-      tags: ['family', 'risk'],
-      fx: (gg) => {
-        gg.player.econ.debt += gg.flags._bail; gg.player.econ.debtRate = 0.34;
-        gg.player.stress += 18; gg.npcs.sibling.helped += 1; gg.npcs.sibling.risk -= 18;
-        remember(gg, 'bail_paid', `${gg.world.year}년, 형의 보석금을 사채로 냈다.`, 0.9);
-      },
-      out: () => '형은 사흘 뒤에 나왔다. 아무 말도 하지 않고 내 어깨를 한 번 쳤다.\n이자 34%. 이 숫자가 앞으로 몇 년간 내 이적 협상을 지배한다.' },
-    { t: '"통장 털고 나머지는 구단에 부탁하자. 창피한 건 나중 문제야."',
-      meta: '자산 소진 · 구단 신뢰 −8 · 감독이 사정을 알게 됨',
-      tags: ['safe'],
-      fx: (gg) => {
-        const short = Math.max(0, gg.flags._bail - gg.player.econ.assets);
-        gg.player.econ.assets = Math.max(0, gg.player.econ.assets - gg.flags._bail);
-        if (short > 0) { gg.player.econ.debt += short; gg.player.econ.debtRate = 0.0; }
-        gg.npcs.coach.trust -= 8; gg.npcs.sibling.risk -= 12; gg.npcs.sibling.helped += 1;
-        remember(gg, 'bail_club', `${gg.world.year}년, 구단 가불로 형의 보석금을 냈다.`, 0.85);
-      },
-      out: () => '단장실에서 30분을 설명했다. 이자는 없다고 했다.\n다음 주부터 감독이 나를 다르게 봤다. 좋은 쪽인지 나쁜 쪽인지는 아직 모른다.' },
-    { t: '"이번엔 안 내자. 계속 이러면 나도 같이 가라앉아."',
-      meta: '부채 0 · 형 관계 파탄 · 스트레스 +++ · 30대 이벤트 분기 결정',
-      tags: [],
-      fx: (gg) => {
-        gg.player.stress += 26; gg.npcs.sibling.risk += 14; gg.npcs.sibling.state = 'INCIDENT';
-        gg.flags.abandonedSibling = true;
-        remember(gg, 'bail_refused', `${gg.world.year}년, 형의 보석금을 내지 않았다.`, 0.95);
-      },
-      out: () => '전화를 끊고 다시 걸지 않았다.\n그해 여름 어머니 집에 가지 않았다. 이 결정은 십 년 뒤에 다시 돌아온다.' },
-  ]),
-});
-
-ev({
-  id: 'loan_shark',
-  when: (g) => g.player.active && g.player.econ.debt > 20000 && g.player.econ.debtRate > 0.2,
-  once: true, w: () => 300,
-  body: (g) => `훈련장 주차장에 낯선 차가 서 있었다.\n\n` +
-    `두 사람이 내려서 내 이름을 정확히 불렀다. 소속팀도, 다음 원정 일정도 알고 있었다.\n` +
-    `현재 부채 ${fmtMoney(g.player.econ.debt)}. 연이자 34%는 원금을 2년마다 두 배로 만든다.\n\n` +
-    `그들은 위협하지 않았다. 오히려 정중했다. 그게 더 무서웠다.\n` +
-    `"경기 잘 보고 있습니다. 다음 달까지만요."\n\n` +
-    `구단에 알리면 계약에 도덕 조항이 걸린다. 언론이 알면 이적 시장에서 값이 떨어진다.\n` +
-    `혼자 해결해야 한다는 것만 확실하다.`,
-  choices: () => [
-    { t: '"구단에 털어놓자. 이자 34%는 혼자 감당이 안 돼."', meta: '이자 34% → 9% · 평판 −5 · 감독 신뢰 −6', tags: ['safe'],
-      fx: (gg) => { gg.player.econ.debtRate = 0.09; gg.player.reputation -= 5; gg.npcs.coach.trust -= 6; gg.player.stress -= 10; },
-      out: () => '단장이 은행을 연결해줬다. 대신 그 얘기가 라커룸에 돌았다.' },
-    { t: '"이적해서 계약금으로 한 번에 털자."', meta: '다음 이적에서 연봉보다 계약금 우선 · 축구적 후퇴 가능', tags: ['risk'],
-      fx: (gg) => { gg.flags.chaseMoney = true; gg.player.stress += 8; },
-      out: () => '에이전트에게 상황을 전부 말했다. "그럼 조건은 제가 정합니다."' },
-    { t: '"버티자. 시즌만 끝나면 갚을 수 있어."', meta: '이자 계속 · 스트레스 +++ · 성장률 패널티', tags: ['pride'],
-      fx: (gg) => { gg.player.stress += 22; },
-      out: () => '버텼다. 그 시즌 내내 밤에 잠들기까지 두 시간이 걸렸다.' },
-  ],
 });
 
 ev({
@@ -2260,12 +1898,15 @@ ev({
   body: (g) => {
     const last = g.player.career.seasons[g.player.career.seasons.length - 1];
     const benched = last && last.apps < 6;
+    const loans = loanTargets(g, 2);
     const offers = benched ? generateOffers(g, 2) : [];
     g.flags._offers = offers.map((c) => c.id);
-    g.flags._loans = loanTargets(g, 2).map((c) => c.id);
-    return `${g.player.club.name} · 전반기 ${last ? `${last.apps}경기 ${last.goals}골` : '기록 없음'}\n감독 신뢰 ${round(g.npcs.coach.trust)}/100\n\n` +
-      (benched ? '이 상태로 후반기를 보내면 시즌 하나가 통째로 사라진다.\n에이전트: "6개월 임대로 나가야 해."'
-               : '전반기는 나쁘지 않았다. 체력이 떨어지는 시기다.');
+    g.flags._loans = loans.map((c) => c.id);
+    let line;
+    if (!benched) line = '전반기는 나쁘지 않았다. 체력이 떨어지는 시기다.';
+    else if (loans.length) line = '이 상태로 후반기를 보내면 시즌 하나가 통째로 사라진다.\n에이전트: "6개월 임대로 나가야 해."';
+    else line = '이 상태로 후반기를 보내면 시즌 하나가 통째로 사라진다.\n에이전트: "지금 너를 임대로 받아줄 데가 없어. 여기서 출전 시간을 만들 방법을 찾아야 해."';
+    return `${g.player.club.name} · 전반기 ${last ? `${last.apps}경기 ${last.goals}골` : '기록 없음'}\n감독 신뢰 ${round(g.npcs.coach.trust)}/100\n\n` + line;
   },
   choices: (g) => {
     const offers = (g.flags._offers || []).map(clubById).filter(Boolean);
@@ -2355,11 +1996,11 @@ ev({
     { t: '"세게 요구하자. 이 정도 받을 자격은 있잖아."', meta: '성공 시 연봉 ×2.0 / 실패 시 신뢰 −16', risk: 'HIGH', parent: 0, injury: 0, tags: ['pride', 'risk'],
       fx: (gg) => {
         if (gg.player.reputation + gg.npcs.coach.trust / 2 > 92) { gg.player.contractUntil = gg.world.year + 4; gg.flags.wageBump = 2.0; }
-        else { gg.npcs.coach.trust -= 16; gg.player.stress += 12; gg.flags.standoff = true; }
+        else { gg.npcs.coach.trust -= 16; gg.player.stress += 12; gg.flags.standoff = true; gg.player.contractUntil = gg.world.year + 1; }
       },
       out: (gg) => gg.flags.standoff ? '구단이 제안을 철회했다. 팬들은 "돈만 아는 선수"라고 쓴다.' : '요구가 통했다.' },
     { t: '"계약을 흘리자. FA로 나가면 조건은 내가 골라."', meta: '이적료 0 · 야유 · 신뢰 −20', risk: 'HIGH', parent: -1, injury: 0, tags: ['risk', 'ambition'],
-      fx: (gg) => { gg.npcs.coach.trust -= 20; gg.player.stress += 14; gg.flags.goingFA = true; },
+      fx: (gg) => { gg.npcs.coach.trust -= 20; gg.player.stress += 14; gg.flags.goingFA = true; gg.player.contractUntil = gg.world.year + 1; },
       out: () => '이적료 없이 나갈 수 있다. 대신 이번 시즌 내내 야유를 듣는다.' },
   ],
 });
@@ -2384,52 +2025,6 @@ ev({
 });
 
 ev({
-  // 금융위기는 "고정 스토리"가 아니라 세계 상태 변화다. 아버지의 결과는 확률로 갈린다.
-  // 18세 프로 진입 판정이 끝난 뒤에만 발동한다 — 그 전에 걸리면 게이트를 우회해 계약이 생긴다
-  id: 'crisis2008', once: true,
-  when: (g) => g.world.year >= 2008 && g.world.year <= 2010 && A(g) >= 18 && A(g) <= 20 &&
-    (g.flags.proEntryDone || (g.player.club && !g.player.club.youth)),
-  w: () => 1400,
-  body: (g) => {
-    const e = ENV(g);
-    const f = g.npcs.father;
-    const res = rollFatherEmployment(g, 55);
-    g.flags._crisisRes = res ? res.key : 'NONE';
-    const head = `${g.world.year}년. 금융위기의 여파가 스페인을 정면으로 때렸다. 건설업이 멈추고 실업률이 치솟는다.\n\n` +
-      `${e.label} 가정 — 안전망 ${e.safety}/100\n${f.name} · ${f.job}\n\n`;
-    if (!res) return head + `아버지는 이미 일을 놓은 상태다. 이번 위기는 그 사실을 더 분명하게 만들 뿐이다.`;
-    const tail = {
-      KEEP: `아버지의 자리는 남았다. 주변에서 사람이 계속 빠져나가는 걸 보면서, 아버지는 아무 말도 하지 않았다.\n가계는 버틴다. 다만 집 안 공기가 달라졌다.`,
-      PAYCUT: `임금이 깎였다. 같은 시간을 일하고 더 적게 받는다.\n아버지는 그걸 "일이 있는 게 어디냐"고 표현했다.`,
-      HOURS: `근무시간이 줄었다. 오후 세 시에 집에 있는 아버지를 처음 봤다.\n둘 다 어색해서 아무 말도 안 했다.`,
-      FIRED: `아버지가 일을 잃었다. 그 얘기를 한 달 뒤에 했다.\n그동안 매일 아침 같은 시간에 집을 나갔다고 했다.`,
-      MOVED: `아버지가 다른 일자리로 옮겼다. ${f.job}. 예전보다 못한 조건이지만 일은 있다.`,
-    }[res.key];
-    return head + tail + `\n\n가계 ${res.hit ? res.hit : '변동 없음'} → 현재 ${round(g.player.econ.household)}/100`;
-  },
-  choices: () => [
-    { t: '"지금 서명하자. 집이 먼저 무너지면 축구도 없어."', meta: '즉시 수입 · 학업 포기', risk: 'MID', parent: 2, injury: 1, tags: ['ambition'],
-      fx: (gg) => {
-        gg.player.econ.household = clamp(gg.player.econ.household + 14, 0, 100);
-        // 세미프로 신분이면 이 계약도 3부를 벗어나지 못한다
-        const minDiv = (gg.flags.semiProLock && ageOf(gg) < 24) ? 3 : 2;
-        const dom = CLUBS.filter((c) => c.nat === 'ESP' && c.div >= minDiv && scoutedValue(gg, c) >= c.req - 8);
-        joinClub(gg, dom.length ? gg.rng.pick(dom) : clubById('esp3:CE Sabadell'), { years: 3 });
-        shiftReaction(gg, 2, '가계를 구한 계약'); gg.player.stress += 14; gg.flags.breadwinner = true;
-        remember(gg, 'breadwinner', '2008년 금융위기. 18세에 내 연봉이 집안의 주 수입이 됐다.', 0.95);
-      },
-      out: () => '열여덟에 가장이 됐다. 그 순간 아버지의 눈을 봤다. 고마움과 미안함이 같이 있었다.' },
-    { t: '"학교도 붙잡자. 떨어질 데는 있어야지."', meta: '안전망 확보 · 성장 −', risk: 'SAFE', parent: -1, injury: 0, tags: ['safe'],
-      fx: (gg) => {
-        // 가계 타격은 body 의 고용 판정에서 이미 반영됐다. 여기서 또 깎지 않는다.
-        gg.player.hidden.absorption -= 6; gg.player.willToPlay -= 6; gg.player.academic += 12; gg.flags.university = true;
-        remember(gg, 'crisis_safe', '2008년 위기 앞에서 안전한 길을 택했다.', 0.8);
-      },
-      out: () => '축구는 계속한다. 다만 이제 우선순위가 두 번째다.' },
-  ],
-});
-
-ev({
   id: 'covid', once: true, when: (g) => g.world.year === 2020 && g.player.active && A(g) >= 25, w: () => 3000,
   body: (g) => `2020년 3월. 리그가 멈췄다.\n\n${g.player.club ? g.player.club.name : '소속팀'}이 전 선수 임금 삭감안을 통보했다. 무관중 경기가 언제까지 갈지 아무도 모른다.\n\n만 ${A(g)}세. 커리어에서 반년은 짧지 않다.`,
   choices: () => [
@@ -2442,31 +2037,6 @@ ev({
     { t: '"거실에서라도 하자. 재개되면 몸 된 놈이 뛰는 거야."', meta: '건강 ++ · 부상 위험 −', risk: 'SAFE', parent: 0, injury: 0, tags: ['discipline'],
       fx: (gg) => { gg.player.fitness = clamp(gg.player.fitness + 16, 0, 100); gg.player.hidden.injuryProne -= 6; gg.player.econ.wageYear = round(gg.player.econ.wageYear * 0.8); },
       out: () => '거실에서 매일 두 시간. 리그가 재개됐을 때 몸이 가장 좋은 선수 중 하나였다.' },
-  ],
-});
-
-ev({
-  id: 'nt_choice', once: true,
-  when: (g) => g.player.secondNationality && A(g) >= 19 && A(g) <= 27 && !g.player.ntTeam &&
-    !g.player.ntLocked && g.player.reputation > 26 && g.player.club && !g.player.club.youth && g.player.club.div <= 2,
-  w: () => 250,
-  body: (g) => {
-    const s = g.player.secondNationality;
-    return `이중국적자다. 두 협회가 모두 연락을 해왔다.\n\n` +
-      `· 스페인 — 경쟁 강도 ${NT_BAR.ESP}/100. 부를지 알 수 없다.\n` +
-      `· ${NT_NAME[s]} — 경쟁 강도 ${NT_BAR[s]}/100. 지금 가면 바로 주전이고, 메이저 대회에 나갈 수 있다.\n\n` +
-      `FIFA 규정상 A매치 메이저 대회에 출전하는 순간 이 선택은 영구히 닫힌다.`;
-  },
-  choices: (g) => [
-    { t: `"${NT_NAME[g.player.secondNationality]}로 가자. 부르는 데서 뛰는 게 맞지."`, meta: '즉시 주전 · 메이저 대회 출전 가능', risk: 'MID', parent: 1, injury: 0, tags: ['risk'],
-      fx: (gg) => {
-        gg.player.ntTeam = gg.player.secondNationality; gg.player.reputation += 8;
-        remember(gg, 'nt_switch', `${gg.world.year}년, 스페인 대신 ${NT_NAME[gg.player.ntTeam]} 대표팀을 선택했다.`, 0.85);
-      },
-      out: (gg) => `${NT_NAME[gg.player.ntTeam]} 유니폼을 입었다. 부모님이 그 경기를 보며 울었다.` },
-    { t: '"기다리자. 이 유니폼이 아니면 의미가 없어."', meta: '못 뽑힐 가능성 있음', risk: 'HIGH', parent: 0, injury: 0, tags: ['pride'],
-      fx: (gg) => { gg.player.trait.pride += 10; gg.flags.waitedESP = true; },
-      out: () => '한 번도 부르지 않을 수도 있다. 그래도 이 유니폼이어야 했다.' },
   ],
 });
 
@@ -2582,7 +2152,7 @@ ev({
 ev({
   id: 'quit_temptation', when: (g) => A(g) >= 15 && A(g) <= 24 && g.player.willToPlay < 42 && g.player.active, w: () => 260,
   body: (g) => `축구를 계속할 이유를 못 찾겠다.\n\n출전 시간은 줄고, 몸은 아프고, 같이 시작한 애들 절반은 이미 그만뒀다.\n` +
-    `${g.npcs.mother.name}이 조용히 다른 얘기를 꺼낸다.\n\n(축구 의지 ${round(g.player.willToPlay)}/100 · 학업 ${round(g.player.academic)}/100)`,
+    `(축구 의지 ${round(g.player.willToPlay)}/100 · 학업 ${round(g.player.academic)}/100)`,
   choices: () => [
     { t: '"그만두자. 더 붙잡을 이유를 못 찾겠어."', meta: '커리어 종료', risk: 'HIGH', parent: 0, injury: 0, tags: ['safe'],
       fx: (gg) => { gg.player.active = false; gg.player.path.push(`${gg.world.year} 축구 중단`); remember(gg, 'quit', `${gg.world.year}년, ${A(gg)}세에 축구를 그만뒀다.`, 1.0); },
@@ -2610,24 +2180,6 @@ ev({
     { t: '"20분씩 나가는 것도 역할이지. 받아들이자."', meta: '신뢰 ++ · 부상 위험 −', risk: 'SAFE', parent: 0, injury: 0, tags: ['adaptability'],
       fx: (gg) => { gg.npcs.coach.trust += 14; gg.player.stress -= 10; gg.player.hidden.injuryProne -= 6; gg.flags.veteran = true; },
       out: () => '20분씩 나가서 경기를 정리한다. 어린 선수들이 질문을 하러 온다.' },
-  ],
-});
-
-ev({
-  id: 'father_callback', once: true, when: (g) => A(g) >= 31 && hasMemory(g, 'promise_school'), w: () => 200,
-  body: (g) => {
-    const m = getMemory(g, 'promise_school');
-    const f = g.npcs.father;
-    return `${f.name}과 저녁을 먹는다. ${f.age1990 + (g.world.year - 1990)}세. 이제 그는 늙었다.\n\n` +
-      `"${m.year}년에 네가 성적 유지한다고 해서 축구 시켜준 거 기억나냐."\n\n잠시 말이 없다가,\n\n"그때 내가 반대만 했으면… 지금 너는 어디 있었을까 싶다."`;
-  },
-  choices: () => [
-    { t: '"아버지가 허락해줘서 여기까지 온 거예요."', meta: '스트레스 −− · 관계 회복', risk: 'SAFE', parent: 1, injury: 0, tags: ['family'],
-      fx: (gg) => { gg.player.stress -= 14; gg.flags.fatherResolved = true; shiftReaction(gg, 1, '아버지와 화해'); },
-      out: (gg) => { remember(gg, 'father_resolved', '아버지와 화해했다. 30년 걸렸다.', 0.95); return '아버지가 고개를 끄덕이고 접시를 치웠다. 그게 그 사람의 방식이다.'; } },
-    { t: '"저는 허락 없어도 했을 거예요."', meta: '자존심 +', risk: 'MID', parent: 0, injury: 0, tags: ['pride'],
-      fx: (gg) => { gg.player.trait.pride += 10; },
-      out: () => '아버지가 웃었다. "그래, 너는 그랬겠지."' },
   ],
 });
 
@@ -2661,8 +2213,8 @@ ev({
         fx: (gg) => {
           gg.flags.drifting = false;
           gg.player.econ.assets += 14000;
-          // 크게 성공하는 경우는 소수다. 학업 기반과 가정의 자본이 확률을 만든다.
-          const pSucc = clamp(0.10 + (gg.player.academic - 45) / 190 + gg.player.econ.household / 400, 0.04, 0.42);
+          // 크게 성공하는 경우는 소수다. 학업 기반이 확률을 만든다.
+          const pSucc = clamp(0.10 + (gg.player.academic - 45) / 150, 0.04, 0.42);
           gg.flags.lifeTrack = gg.rng.chance(pSucc) ? 'SUCCESS' : 'NORMAL';
         },
         out: (gg) => gg.flags.lifeTrack === 'SUCCESS'
@@ -2699,16 +2251,8 @@ ev({
 function historyImpact(g, h) {
   const y = g.world.year;
   const p = g.player;
-  const f = g.npcs.father;
   const L = [];
 
-  if (h.money && h.money < 0) {
-    L.push(`가계 ${h.money} → 현재 가계 ${round(p.econ.household)}/100. ` +
-      `${f.name}의 일(${f.status === '실직' ? '실직 상태' : f.job})이 직접 영향권에 들어간다.`);
-    if (p.econ.household < 30) L.push('가계가 30 미만이라, 앞으로의 선택에서 안전한 쪽(돈)이 계속 끌어당긴다.');
-  } else if (h.money && h.money > 0) {
-    L.push(`가계 +${h.money} → 현재 ${round(p.econ.household)}/100. 일자리가 늘어난다.`);
-  }
   if (h.boom) L.push(`축구 열기 +${h.boom} — 유소년 등록과 스카우팅 활동이 늘어난다.`);
 
   const clim = marketClimate(g);
@@ -2802,38 +2346,20 @@ export function beginTurn(g) {
     setNews(g, `${g.world.year}년: 임대를 마치고 ${back.name}으로 복귀했다.`);
   }
 
+  // 계약 만료 연도가 현재 시즌보다 과거로 표시되지 않게 한다.
+  // (재계약을 거절하고 이적도 못 한 채 눌러앉으면 구단이 단년 계약으로 붙잡는다)
+  if (g.player.club && !g.player.club.youth && g.player.active) {
+    g.player.contractUntil = Math.max(g.player.contractUntil || 0, g.world.year);
+  }
+
   const h = HISTORY[g.world.year];
   if (h && g.world.phase === 'SUMMER' && !g.flags[`_h${g.world.year}`]) {
     g.flags[`_h${g.world.year}`] = true;
-    if (h.money) g.player.econ.household = clamp(g.player.econ.household + h.money, 0, 100);
     if (h.boom) g.world.boom += h.boom;
     const impact = historyImpact(g, h);
     pushLog(g, 'history',
       h.t.map((x) => `◆ ${x}`).join('\n') +
       (impact.length ? `\n\n[이번 기간에 미치는 영향]\n` + impact.map((x) => `· ${x}`).join('\n') : ''));
-  }
-
-  // 부모 상태 갱신 — 실직 후 재취업하거나, 나이가 차면 은퇴한다
-  const fa = g.npcs.father.age1990 + (g.world.year - 1990);
-  if (g.npcs.father.status === '실직' && g.world.year - (g.npcs.father.statusYear || 0) >= 2) {
-    if (fa >= 65) { g.npcs.father.status = '은퇴'; pushLog(g, 'parent', `아버지가 일을 완전히 놓았다. ${fa}세.`); }
-    else if (g.rng.chance(0.35)) {
-      g.npcs.father.status = '재취업';
-      g.npcs.father.job = g.rng.pick(FAMILY_ENVS[g.player.env].jobs);
-      pushLog(g, 'parent', `아버지가 다시 일을 구했다. ${g.npcs.father.job}. 예전 급여의 절반이다.`);
-    }
-  } else if (!g.npcs.father.status && fa >= 66) {
-    g.npcs.father.status = '은퇴';
-  }
-
-  // 아버지 고용은 매년 확률적으로 움직인다 (경제 상태가 압력을 만든다)
-  if (g.world.phase === 'SUMMER' && ageOf(g) >= 17 && g.npcs.father.status !== '은퇴') {
-    const clim = marketClimate(g);
-    const pressure = (clim.global ? 40 : 0) + (clim.domestic ? 25 : 0);
-    if (g.rng.chance(pressure > 0 ? 0.30 : 0.07)) {
-      const r = rollFatherEmployment(g, pressure);
-      if (r && r.key !== 'KEEP') pushLog(g, 'parent', `아버지 — ${r.label}. 가계 ${r.hit} → ${round(g.player.econ.household)}/100`);
-    }
   }
 
   applyGrowth(g);
@@ -2939,68 +2465,17 @@ export const TIERS = {
   NP_SUCCESS: { t: 'Success End · 타 분야 성공', d: '공을 놓은 뒤에 오히려 크게 됐다. 인생은 축구보다 길었다.' },
 };
 
-/** 4개 가정환경 그룹 × 9 티어 = 36개 엔딩 셀 */
-const GROUP_LABEL = {
-  IMM_LOW: '이민자 하위·다문화',
-  IMM_HIGH: '이민자 중상위',
-  LOC_LOW: '원주민 하위·중위',
-  LOC_HIGH: '원주민 상위',
-};
+/** 9개 티어 엔딩 — 각 티어당 하나의 에필로그 */
 const EPILOGUE = {
-  T1: {
-    IMM_LOW: '서류 확인을 두 번 받던 아이가, 이 나라 축구의 상징이 됐다. 부모가 처음 도착한 항구에 그의 이름을 딴 유소년 센터가 세워졌다.',
-    IMM_HIGH: '가문의 명예를 공부로 증명하라던 집에서, 다른 방식으로 그것을 증명했다. 아버지는 결국 모든 경기 티켓을 모았다.',
-    LOC_LOW: '동네 광장의 그 벽에 명판이 붙었다. "여기서 시작했다."',
-    LOC_HIGH: '기품 없는 직업이라던 집안이, 이제 그 이름으로 불린다.',
-  },
-  T2: {
-    IMM_LOW: '두 개의 여권을 가진 아이가 두 나라의 자랑이 됐다. 어느 쪽에서도 완전히 자기 편은 아니었지만.',
-    IMM_HIGH: '이민 1세대가 세운 사업보다, 2세대가 세운 이름이 더 커졌다.',
-    LOC_LOW: '가난이 익숙했던 집에 이제 걱정이 없다. 그 사실에 적응하는 데 몇 년이 걸렸다.',
-    LOC_HIGH: '엘리트 가문이 축구를 인정하게 만들었다. 그것도 하나의 승리다.',
-  },
-  T3: {
-    IMM_LOW: '1부 리그의 주전. 이민자 가정의 아이가 여기까지 온 것은 통계적으로 거의 일어나지 않는 일이다.',
-    IMM_HIGH: '안정을 원했던 부모가 이제는 원정 경기까지 따라온다.',
-    LOC_LOW: '동네에서 가장 성공한 사람이 됐다. 그 동네를 떠나지는 않았다.',
-    LOC_HIGH: '집안의 기대와는 다른 트랙이었지만, 결국 같은 계층에 도착했다.',
-  },
-  T4: {
-    IMM_LOW: '1부 무대를 밟았다. 그 사실 하나로 동네 아이들의 진로 계산이 바뀌었다.',
-    IMM_HIGH: '"공부를 했어야 했다"는 말은 더 이상 나오지 않는다.',
-    LOC_LOW: '축구로 집을 샀다. 아버지가 평생 못 한 일이었다.',
-    LOC_HIGH: '집안에서는 여전히 "그 정도면 됐다"고 말한다. 본인은 다르게 생각한다.',
-  },
-  T5: {
-    IMM_LOW: '화려하지 않았다. 다만 축구로 가족을 먹였고, 그게 원래 목표였다.',
-    IMM_HIGH: '부모가 옳았을지도 모른다. 그래도 후회는 하지 않는다.',
-    LOC_LOW: '2부와 3부를 오갔다. 매주 90분을 뛰는 삶이었다.',
-    LOC_HIGH: '집안의 우려가 절반은 맞았다. 절반은 틀렸다.',
-  },
-  T6: {
-    IMM_LOW: '프로 계약서에 서명했다는 사실만은 남았다. 그것도 아무나 하는 게 아니다.',
-    IMM_HIGH: '결국 학위가 더 쓸모 있었다. 그래도 벤치에서 본 1부 경기장은 기억에 남는다.',
-    LOC_LOW: '벤치가 대부분이었다. 그래도 프로였다.',
-    LOC_HIGH: '짧게 프로였다가 집안 사업으로 돌아갔다.',
-  },
-  NP_BAD: {
-    IMM_LOW: '축구가 유일한 탈출구였고, 그 문이 닫혔다. 돌아갈 곳이 원래 없었다.',
-    IMM_HIGH: '집안의 기대와 자신의 실패 사이에서 오래 표류했다.',
-    LOC_LOW: '동네를 벗어나지 못했다. 광장에는 아직 그 벽이 있다.',
-    LOC_HIGH: '가진 것이 많았는데도 방향을 찾지 못했다. 그게 더 오래 아팠다.',
-  },
-  NP_NORMAL: {
-    IMM_LOW: '부모가 원했던 안정을 결국 손에 넣었다. 축구는 어린 시절의 일이 됐다.',
-    IMM_HIGH: '집안이 처음부터 원했던 길로 돌아갔다. 나쁘지 않은 삶이다.',
-    LOC_LOW: '평범한 직장, 평범한 주말. 일요일에는 여전히 경기를 본다.',
-    LOC_HIGH: '예정된 트랙으로 복귀했다. 아무도 그것을 실패라고 부르지 않았다.',
-  },
-  NP_SUCCESS: {
-    IMM_LOW: '축구를 놓은 손으로 다른 것을 잡았고, 그게 더 크게 됐다. 이민 1세대의 계획보다 멀리 갔다.',
-    IMM_HIGH: '가문이 원한 트랙에서 정점을 찍었다. 축구는 좋은 이야기거리가 됐다.',
-    LOC_LOW: '스물넷에 시작한 일이 마흔에 회사가 됐다. 유소년 팀을 하나 후원하고 있다.',
-    LOC_HIGH: '집안의 자산을 몇 배로 키웠다. 사무실에는 열두 살 때의 팀 사진이 걸려 있다.',
-  },
+  T1: '골목에서 시작한 아이가 이 시대 축구의 기준이 됐다. 그 이름 없이는 이 시대를 설명할 수 없다.',
+  T2: '세계가 아는 이름이 됐다. 어느 경기장에 가도 등번호가 걸려 있다.',
+  T3: '유럽 1부의 확실한 주전, 대표팀의 핵심. 통계적으로 거의 일어나지 않는 일을 해냈다.',
+  T4: '1부 무대를 완주했다. 그 문턱을 넘는 사람이 몇 안 된다.',
+  T5: '2·3부를 오갔다. 화려하지 않았지만, 매주 90분을 뛰며 축구로 먹고살았다.',
+  T6: '프로 계약서에 서명했다는 사실만은 남았다. 대부분의 시간은 벤치였지만, 그것도 아무나 하는 게 아니다.',
+  NP_BAD: '축구가 사라진 자리에 아무것도 들어오지 않았다. 오래 표류했다.',
+  NP_NORMAL: '축구는 어린 시절의 일이 됐다. 평범한 주말, 일요일에는 여전히 경기를 본다.',
+  NP_SUCCESS: '공을 놓은 손으로 다른 것을 잡았고, 그게 더 크게 됐다. 인생은 축구보다 길었다.',
 };
 
 export function classify(g) {
@@ -3035,7 +2510,6 @@ export function finish(g) {
   g.over = true; p.retired = true;
   const key = classify(g);
   const tier = TIERS[key];
-  const group = FAMILY_ENVS[p.env].group;
 
   const turning = g.memories.slice().sort((a, b) => b.importance - a.importance)[0];
   const regret = g.memories
@@ -3043,18 +2517,13 @@ export function finish(g) {
     .sort((a, b) => b.importance - a.importance)[0];
 
   g.ending = {
-    key, group,
+    key,
     t: tier.t, d: tier.d,
-    epilogue: (EPILOGUE[key] && EPILOGUE[key][group]) || '',
-    groupLabel: GROUP_LABEL[group],
-    cell: `${key} × ${group}`,
+    epilogue: EPILOGUE[key] || '',
+    cell: key,
     bio: {
       name: p.name, span: `1990–${g.world.year}`,
-      env: FAMILY_ENVS[p.env].label + (p.immigrantBg ? ` · ${p.immigrantBg} 출신` : ''),
-      personality: PARENT_PERSONALITIES[p.personality].label,
-      reaction: REACTIONS[g.world.reaction].label,
-      father: `${g.npcs.father.name} — ${g.npcs.father.job}`,
-      mother: `${g.npcs.mother.name} — ${g.npcs.mother.job}`,
+      nationality: NT_NAME[p.nationality],
       position: POSITIONS[p.position].label,
       apps: p.career.apps, goals: p.career.goals, assists: p.career.assists,
       caps: p.career.caps, ntGoals: p.career.ntGoals,
@@ -3062,7 +2531,6 @@ export function finish(g) {
       trophies: p.career.trophies,
       awards: p.awards,
       injuries: p.career.injuries || [],
-      debt: p.econ.debt > 0 ? fmtMoney(p.econ.debt) : '없음',
       totalEarned: fmtMoney(p.econ.totalEarned),
       assets: fmtMoney(p.econ.assets),
       peakSalary: fmtWeekly(Math.max(0, ...p.career.seasons.map((s) => s.salary || 0))),
@@ -3129,11 +2597,10 @@ export function careerTable(g) {
 export function dashboard(g) {
   const p = g.player;
   const abil = ability(g);
-  const r = REACTIONS[g.world.reaction];
   return {
     backstory: g.backstory || '',
     period: periodLabel(g), age: ageOf(g), name: p.name,
-    nationality: p.immigrantBg ? `스페인 (${p.immigrantBg} 배경)` : '스페인',
+    nationality: NT_NAME[p.nationality],
     position: POSITIONS[p.position].label,
     club: p.club ? `${p.club.name}${p.loanFrom ? ` (${p.loanFrom.name} 임대)` : ''}` : '무소속',
     // 리그명에 이미 "(3부)" 같은 표기가 있으면 티어를 중복 표기하지 않는다
@@ -3143,25 +2610,14 @@ export function dashboard(g) {
     condition: `${round(p.fitness)}%`,
     health: p.injuryWeeks > 0 ? `부상 ${round(p.injuryWeeks)}주` : '건강',
     mental: p.stress > 70 ? '불안' : p.confidence > 70 ? '최상' : p.confidence > 45 ? '보통' : '흔들림',
-    family: {
-      env: FAMILY_ENVS[p.env].label,
-      personality: PARENT_PERSONALITIES[p.personality].label,
-      reaction: r.label, reactionIdx: g.world.reaction, reactionBlurb: r.blurb,
-      father: `${g.npcs.father.name} · ${g.npcs.father.status ? `${g.npcs.father.status}${g.npcs.father.status === '재취업' ? ` (${g.npcs.father.job})` : ''}` : g.npcs.father.job}`,
-      mother: `${g.npcs.mother.name} · ${g.npcs.mother.job}`,
-      household: g.player.econ.household >= 65 ? '안정' : g.player.econ.household >= 38 ? '보통' : '어려움',
-    },
     econ: {
       wage: p.econ.wageYear ? fmtWeekly(p.econ.wageYear) : '-',
       wageYearly: p.econ.wageYear ? fmtMoney(p.econ.wageYear) : '-',
       assets: fmtMoney(p.econ.assets),
-      debt: p.econ.debt > 0 ? `${fmtMoney(p.econ.debt)} (이자 ${Math.round(p.econ.debtRate * 100)}%)` : '없음',
-      hasDebt: p.econ.debt > 0,
     },
     teamAvg: p.club && !p.club.youth ? teamAvgAt(p.club, g.world.year) : null,
     fit: p.club && !p.club.youth ? fitLabel(g, p.club).label : null,
     awards: p.awards,
-    sibling: g.npcs.sibling ? `${g.npcs.sibling.name} — ${{ STABLE: '안정', DRIFT: '이탈', SLUM: '슬럼', INCIDENT: '사건 이후', RECOVER: '회복', PRISON: '수감', DEAD: '사망' }[g.npcs.sibling.state]}` : '-',
     injuries: (p.career.injuries || []).slice(-3),
     coach: g.npcs.coach.unknown ? '(미정)' : String(round(g.npcs.coach.trust)),
     contract: p.contractUntil ? `${p.contractUntil}년까지` : '-',
@@ -3185,7 +2641,7 @@ function scoreChoice(g, ch) {
     if (tag === 'risk') s += (t.risk - 50) * 0.20;
     if (tag === 'adaptability') s += (t.adaptability - 45) * 0.18;
     if (tag === 'discipline') s += 2;
-    if (tag === 'safe') s += (55 - t.risk) * 0.16 + (g.player.econ.household < 30 ? 3 : 0);
+    if (tag === 'safe') s += (55 - t.risk) * 0.16;
   }
   return s;
 }
@@ -3205,26 +2661,24 @@ export function autoPlay(g, maxTurns = 400) {
 }
 
 export function batch(n = 1000, opts = {}) {
-  const counts = {}, envs = {}, cells = {}, samples = [];
+  const counts = {}, cells = {}, samples = [];
   const base = opts.seed ?? 12345;
   for (let i = 0; i < n; i++) {
     const g = newGame({ ...opts, seed: (base + i * 7919) | 0 });
     autoPlay(g);
     counts[g.ending.key] = (counts[g.ending.key] || 0) + 1;
-    envs[g.player.env] = (envs[g.player.env] || 0) + 1;
     cells[g.ending.cell] = (cells[g.ending.cell] || 0) + 1;
     if (samples.length < (opts.keepSamples ?? 10)) {
       samples.push({
         seed: g.seed, name: g.player.name, ending: g.ending.key, tier: g.ending.t,
-        env: FAMILY_ENVS[g.player.env].label, pers: PARENT_PERSONALITIES[g.player.personality].label,
-        react: REACTIONS[g.world.reaction].label,
+        nat: NT_NAME[g.player.nationality], position: POSITIONS[g.player.position].label,
         pot: g.player.hidden.potential, peak: round(g.player.peakOvr),
         apps: g.player.career.apps, goals: g.player.career.goals, caps: g.player.career.caps,
         path: g.player.path.join(' → '),
       });
     }
   }
-  return { n, counts, envs, cells, samples };
+  return { n, counts, cells, samples };
 }
 
-export const _internal = { EVENTS, LEAGUES, growthCurve, developmentCeiling, salaryFor, GROUP_LABEL, EPILOGUE };
+export const _internal = { EVENTS, LEAGUES, growthCurve, developmentCeiling, salaryFor, EPILOGUE };
